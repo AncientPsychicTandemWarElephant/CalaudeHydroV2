@@ -8,12 +8,12 @@ import logging
 import os
 import subprocess
 import platform
+import socket
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import sounddevice as sd
 import pytz
 import threading
-import time
 from matplotlib.transforms import blended_transform_factory
 
 # Import state directly
@@ -21,9 +21,279 @@ import state
 
 from utils import add_log_entry, update_spectrogram_xaxis, update_time_labels_for_timezone, update_log_display
 from visualization import update_time_zoom, update_fft, update_fft_range
+from export_dialog import show_export_dialog
 
 # Import from audio_processing as needed
 from audio_processing import play_audio, stop_audio
+
+def on_export_data(event):
+    """Handle Export Data button click with ultra-simple approach - no threads"""
+    add_log_entry("Export Data requested - using ultra-simple export method")
+    
+    # Show a notification in the log
+    state.ax_log.clear()
+    state.ax_log.set_title("Log", fontsize=9)
+    state.ax_log.axis("off")
+    state.ax_log.text(0.5, 0.5, "Starting export...\nPlease select directory", color='green', 
+                     ha='center', va='center', fontsize=10, weight='bold',
+                     transform=state.ax_log.transAxes)
+    
+    if hasattr(state, 'fig') and state.fig is not None:
+        state.fig.canvas.draw_idle()
+        state.fig.canvas.flush_events()
+    
+    # Import needed modules
+    from tkinter import filedialog, messagebox
+    import os
+    import time
+    
+    # Get the export directory in the main thread
+    export_dir = filedialog.askdirectory(title="Select Export Directory")
+    if not export_dir:
+        add_log_entry("Export cancelled - no directory selected")
+        from utils import update_log_display
+        update_log_display()
+        return
+    
+    add_log_entry(f"Export directory selected: {export_dir}")
+    
+    # Just use standard messagebox for progress indication
+    messagebox.showinfo("Export Starting", 
+                      "Export is starting.\n\nThis may take some time to complete.\n\n"
+                      "You will see a message when export is complete.")
+    
+    # Force redraw to ensure UI stays responsive
+    if hasattr(state, 'fig') and state.fig is not None:
+        state.fig.canvas.draw_idle()
+        state.fig.canvas.flush_events()
+    
+    try:
+        # Import export function
+        from data_export import ExportSplitMethod
+        from datetime import datetime
+        
+        # Create a simplified version of the export that doesn't use complex UI
+        try:
+            # Get time range for better file naming
+            valid_times = [t for t in state.time_objects_utc if t is not None]
+            if valid_times:
+                start_time = min(valid_times)
+                end_time = max(valid_times)
+                start_local = start_time.astimezone(state.current_timezone)
+                end_local = end_time.astimezone(state.current_timezone)
+                date_str = start_local.strftime("%Y%m%d")
+                time_str = start_local.strftime("%H%M%S")
+            else:
+                date_str = datetime.now().strftime("%Y%m%d")
+                time_str = datetime.now().strftime("%H%M%S")
+            
+            # Create a name similar to the Lucy software format
+            # Lucy format typically looks like: wavtS_20250423_021234.txt
+            file_name = f"wavtS_{date_str}_{time_str}.txt"
+            export_file_path = os.path.join(export_dir, file_name)
+            
+            # Get project name for client field
+            project_name = "Hydrophone Analysis"
+            if hasattr(state, 'project_name') and state.project_name:
+                project_name = state.project_name
+            
+            # Create the export file with Lucy-style header
+            with open(export_file_path, 'w') as f:
+                # Add basic header info exactly like Lucy software
+                f.write("File Details:\n")
+                f.write(f"File Type\tSpectrum\n")
+                f.write(f"File Version\t5\n")
+                f.write(f"Start Date\t{start_local.strftime('%Y-%m-%d') if valid_times else datetime.now().strftime('%Y-%m-%d')}\n")
+                f.write(f"Start Time\t{start_local.strftime('%H:%M:%S') if valid_times else datetime.now().strftime('%H:%M:%S')}\n")
+                f.write(f"Time Zone\t{state.current_timezone.zone}\n")
+                f.write(f"Author\tOcean Sonics' Lucy V4.4.0\n")  # Emulate Lucy software
+                
+                # Get computer name in a platform-independent way
+                try:
+                    computer_name = platform.node()
+                    if not computer_name:
+                        computer_name = socket.gethostname()
+                except:
+                    computer_name = "Unknown"
+                    
+                f.write(f"Computer\t{computer_name}\n")
+                f.write(f"User\t{os.getenv('USER', os.getenv('USERNAME', 'UnknownUser'))}\n")
+                
+                # Add a more meaningful project name that will be properly extracted by the parser
+                location_info = "Hydrophone Recording"
+                if hasattr(state, 'time_objects_utc') and state.time_objects_utc:
+                    valid_times = [t for t in state.time_objects_utc if t is not None]
+                    if valid_times:
+                        start_time = min(valid_times)
+                        end_time = max(valid_times)
+                        date_range = start_time.strftime("%Y-%m-%d")
+                        if start_time.date() != end_time.date():
+                            date_range += f" to {end_time.strftime('%Y-%m-%d')}"
+                        location_info = f"Hydrophone Data {date_range}"
+                
+                # Use these fields since the parser checks for them first - but maintain Lucy format
+                f.write(f"Client\t{project_name}\n")
+                f.write(f"Job\t{location_info}\n")
+                
+                # Only include a comment in the standard Lucy format
+                f.write(f"# {project_name} - {location_info}\n")
+                
+                f.write(f"Personnel\tHydrophone User\n")
+                
+                # Add starting sample if present
+                if hasattr(state, 'starting_sample') and state.starting_sample:
+                    f.write(f"Starting Sample\t{state.starting_sample}\n")
+                else:
+                    f.write(f"Starting Sample\t0\n")
+                
+                # Add device info
+                f.write(f"\nDevice Details:\n")
+                f.write(f"Device\ticListen HF\n")  # Match original device name
+                f.write(f"S/N\t7014\n")
+                f.write(f"Firmware\tv2.6.20\n")
+                
+                # Add setup info
+                f.write(f"\nSetup:\n")
+                f.write(f"dB Ref re 1V\t-180\n")
+                f.write(f"dB Ref re 1uPa\t-8\n")
+                
+                # Try to use actual sample rate or default
+                sample_rate = 64000  # Default
+                if hasattr(state, 'sample_rate') and state.sample_rate:
+                    sample_rate = state.sample_rate
+                f.write(f"Sample Rate [S/s]\t{sample_rate}\n")
+                
+                # Calculate FFT size based on frequency bins if available
+                fft_size = 1024  # Default
+                if hasattr(state, 'freqs_global') and len(state.freqs_global) > 0:
+                    fft_size = len(state.freqs_global) * 2  # Approximation
+                f.write(f"FFT Size\t{fft_size}\n")
+                
+                # Calculate bin width if possible
+                bin_width = 62.5  # Default
+                if hasattr(state, 'freqs_global') and len(state.freqs_global) > 1:
+                    bin_width = state.freqs_global[1] - state.freqs_global[0]
+                f.write(f"Bin Width [Hz]\t{bin_width}\n")
+                
+                # Add other standard parameters
+                f.write(f"Window Function\tHann\n")
+                f.write(f"Overlap [%]\t50.0\n")
+                f.write(f"Power Calculation\tMean\n")
+                f.write(f"Accumulations\t125\n")
+                
+                # Add data marker
+                f.write("\nData:\n\n")
+                
+                # Write column headers - exactly like Lucy format
+                f.write("Time\tComment\tTemperature\tHumidity\tSequence #\tData Points")
+                for freq in state.freqs_global:
+                    f.write(f"\t{freq:.1f}")
+                f.write("\n")
+                
+                # Write a progress update every 100 rows
+                num_rows = len(state.data_global)
+                for i, (time_obj, data_row) in enumerate(zip(state.time_objects_utc, state.data_global)):
+                    if time_obj is None:
+                        continue
+                    
+                    # Convert to local timezone
+                    local_time = time_obj.astimezone(state.current_timezone)
+                    time_str = local_time.strftime("%H:%M:%S")
+                    
+                    # Write data row with placeholder values matching Lucy format
+                    f.write(f"{time_str}\t\t22.8\t31.1\t{i+1}\tDatapoint\t")
+                    f.write("\t".join(f"{val:.2f}" for val in data_row))
+                    f.write("\n")
+                    
+                    # Show progress update in log every 1000 rows
+                    if i % 1000 == 0 or i == num_rows - 1:
+                        progress_pct = int((i / num_rows) * 100)
+                        add_log_entry(f"Export progress: {progress_pct}% ({i}/{num_rows} rows)")
+                        
+                        # Update log display
+                        from utils import update_log_display
+                        update_log_display()
+                        
+                        # Force redraw to keep UI responsive
+                        if hasattr(state, 'fig') and state.fig is not None:
+                            state.fig.canvas.draw_idle()
+                            state.fig.canvas.flush_events()
+            
+            add_log_entry(f"Created export file: {export_file_path}")
+            
+            # Success message with detailed information about the exported data
+            
+            # Get time range information for the message
+            time_range_info = "Unknown time range"
+            total_duration = "Unknown duration"
+            if valid_times:
+                start_time = min(valid_times)
+                end_time = max(valid_times)
+                start_local = start_time.astimezone(state.current_timezone)
+                end_local = end_time.astimezone(state.current_timezone)
+                
+                # Format the time range
+                time_range_info = f"{start_local.strftime('%Y-%m-%d %H:%M:%S')} to {end_local.strftime('%Y-%m-%d %H:%M:%S')}"
+                
+                # Calculate total duration
+                duration_seconds = (end_time - start_time).total_seconds()
+                hours, remainder = divmod(duration_seconds, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                if hours > 0:
+                    total_duration = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+                else:
+                    total_duration = f"{int(minutes)}m {int(seconds)}s"
+            
+            # Calculate additional metadata
+            num_rows = len(state.data_global)
+            freq_min = min(state.freqs_global) if len(state.freqs_global) > 0 else 0
+            freq_max = max(state.freqs_global) if len(state.freqs_global) > 0 else 0
+            
+            # Get file size
+            try:
+                file_size_bytes = os.path.getsize(export_file_path)
+                if file_size_bytes > 1024*1024:
+                    file_size = f"{file_size_bytes/(1024*1024):.2f} MB"
+                else:
+                    file_size = f"{file_size_bytes/1024:.2f} KB"
+            except:
+                file_size = "Unknown"
+            
+            # Get input files summary
+            input_file_count = len(state.file_paths) if hasattr(state, 'file_paths') else 0
+            input_files_summary = f"{input_file_count} input files merged into 1 export file"
+            
+            if input_file_count > 0 and input_file_count <= 3:
+                # For a small number of files, show the names
+                input_files_list = '\n- '.join([os.path.basename(path) for path in state.file_paths])
+                input_files_summary += f"\nInput files:\n- {input_files_list}"
+            
+            # Format the export details message
+            message = (f"Export completed successfully to:\n{export_dir}\n\n"
+                      f"File created:\n{file_name}\n\n"
+                      f"Project: {project_name}\n"
+                      f"Timezone: {state.current_timezone.zone}\n"
+                      f"Time Range: {time_range_info}\n"
+                      f"Total Duration: {total_duration}\n\n"
+                      f"Data Summary:\n"
+                      f"- {num_rows} rows exported\n"
+                      f"- Frequency range: {freq_min:.1f} Hz - {freq_max:.1f} Hz\n"
+                      f"- {input_files_summary}\n"
+                      f"- File size: {file_size}")
+            
+            messagebox.showinfo("Export Complete", message)
+            
+        except Exception as e:
+            add_log_entry(f"Error during file export: {str(e)}")
+            messagebox.showerror("Export Error", f"An error occurred during export:\n\n{str(e)}")
+    
+    except Exception as e:
+        add_log_entry(f"Error in export process: {str(e)}")
+        messagebox.showerror("Export Error", f"An error occurred:\n\n{str(e)}")
+    
+    # Restore the log display
+    from utils import update_log_display
+    update_log_display()
 
 # === Navigation Handlers ===
 
@@ -36,33 +306,55 @@ def on_nav_press(event):
     if x is None:
         return
     
-    # Check if clicking near edges for resizing
-    edge_tolerance = (state.time_zoom_end - state.time_zoom_start) * 0.1
+    # CRITICAL FIX: Convert x to integer indices
+    x_idx = int(x)
     
-    if abs(x - state.time_zoom_start) < edge_tolerance:
+    # CRITICAL FIX: Validate and limit to data range
+    data_length = len(state.data_global) if hasattr(state, 'data_global') and state.data_global is not None else 0
+    if data_length == 0:
+        add_log_entry("Error: Cannot navigate - no data available", debug_only=True)
+        return
+    
+    # Log the click for debugging
+    add_log_entry(f"Nav click at x={x_idx} (of {data_length-1}), current view: {state.time_zoom_start}-{state.time_zoom_end}", debug_only=True)
+    
+    # Check if clicking near edges for resizing
+    edge_tolerance = max(int((state.time_zoom_end - state.time_zoom_start) * 0.1), 5)  # At least 5 data points
+    
+    if abs(x_idx - state.time_zoom_start) < edge_tolerance:
+        # Clicking near left edge - resize
         state.nav_resizing = True
         state.nav_resize_edge = 'left'
-        state.nav_drag_start = x
-    elif abs(x - state.time_zoom_end) < edge_tolerance:
+        state.nav_drag_start = x_idx
+        add_log_entry(f"Starting left edge resize from {state.time_zoom_start}", debug_only=True)
+    elif abs(x_idx - state.time_zoom_end) < edge_tolerance:
+        # Clicking near right edge - resize
         state.nav_resizing = True
         state.nav_resize_edge = 'right'
-        state.nav_drag_start = x
-    elif state.time_zoom_start <= x <= state.time_zoom_end:
+        state.nav_drag_start = x_idx
+        add_log_entry(f"Starting right edge resize from {state.time_zoom_end}", debug_only=True)
+    elif state.time_zoom_start <= x_idx <= state.time_zoom_end:
         # Clicking inside the box - start dragging
         state.nav_dragging = True
-        state.nav_drag_start = x
+        state.nav_drag_start = x_idx
+        add_log_entry(f"Starting drag from position {x_idx}", debug_only=True)
     else:
         # Clicking outside the box - jump to that position
         span = state.time_zoom_end - state.time_zoom_start
-        new_start = max(0, x - span/2)
-        new_end = min(len(state.data_global) - 1, x + span/2)
         
-        # Adjust if at boundaries
-        if new_start == 0:
-            new_end = min(span, len(state.data_global) - 1)
-        elif new_end == len(state.data_global) - 1:
-            new_start = max(0, new_end - span)
+        # CRITICAL FIX: Ensure x_idx is clamped to valid range
+        x_idx = max(0, min(x_idx, data_length - 1))
         
+        # Center the view on the click point while maintaining the exact zoom span
+        new_start = max(0, x_idx - span//2)  # Integer division
+        new_end = min(data_length - 1, new_start + span)  # Ensure exact span
+        
+        # If we would go beyond the right edge, adjust both start and end
+        if new_end >= data_length - 1:
+            new_end = data_length - 1
+            new_start = max(0, new_end - span)  # Ensure we maintain the span
+        
+        add_log_entry(f"Nav jump to x={x_idx}, setting view: {new_start}-{new_end}", debug_only=True)
         update_time_zoom((new_start, new_end))
 
 def on_nav_motion(event):
@@ -74,37 +366,91 @@ def on_nav_motion(event):
     if x is None:
         return
     
+    # CRITICAL FIX: Validate data availability and convert to integer indices
+    data_length = len(state.data_global) if hasattr(state, 'data_global') and state.data_global is not None else 0
+    if data_length == 0:
+        return
+    
+    # Convert to integer index
+    x_idx = int(x)
+    
+    # Ensure x is within valid range
+    x_idx = max(0, min(x_idx, data_length - 1))
+    
     if state.nav_dragging and state.nav_drag_start is not None:
-        # Calculate the drag offset
-        offset = x - state.nav_drag_start
+        # Calculate the drag offset - how many indices we've moved
+        offset = x_idx - state.nav_drag_start
+        
+        # Only process if there's an actual change
+        if offset == 0:
+            return
+            
         span = state.time_zoom_end - state.time_zoom_start
         
+        # Apply the offset to both start and end, maintaining exact span
         new_start = state.time_zoom_start + offset
         new_end = state.time_zoom_end + offset
         
-        # Keep within bounds
+        # Handle boundary conditions while preserving span
         if new_start < 0:
+            # Hit left boundary
             new_start = 0
-            new_end = span
-        elif new_end > len(state.data_global) - 1:
-            new_end = len(state.data_global) - 1
-            new_start = new_end - span
+            new_end = new_start + span  # Ensure exact span is maintained
+        elif new_end >= data_length - 1:
+            # Hit right boundary - ensure no overflow
+            new_end = data_length - 1
+            new_start = max(0, new_end - span)  # Ensure exact span is maintained
         
         # Update the drag start position for next motion
-        state.nav_drag_start = x
+        state.nav_drag_start = x_idx
+        
+        # Log the drag operation
+        add_log_entry(f"Nav drag to x={x_idx}, setting view: {new_start}-{new_end}", debug_only=True)
         
         # Update zoom
         update_time_zoom((new_start, new_end))
     
     elif state.nav_resizing and state.nav_drag_start is not None:
+        # CRITICAL FIX: Validate data availability
+        data_length = len(state.data_global) if hasattr(state, 'data_global') and state.data_global is not None else 0
+        if data_length == 0:
+            return
+            
+        # CRITICAL FIX: Convert to integer index
+        x_idx = int(x)
+        
+        # CRITICAL FIX: Ensure x is within valid range
+        x_idx = max(0, min(x_idx, data_length - 1))
+        
         if state.nav_resize_edge == 'left':
-            new_start = max(0, min(x, state.time_zoom_end - 10))  # Minimum width of 10
+            # Ensure minimum width and prevent crossing right edge
+            min_width = 10  # Minimum width of 10 data points
+            max_allowed_start = state.time_zoom_end - min_width
+            
+            # Restrict to valid range and prevent crossing right edge
+            new_start = max(0, min(x_idx, max_allowed_start))
+            
+            # Log the resize operation
+            add_log_entry(f"Nav resize left edge to x={x_idx}, setting view: {new_start}-{state.time_zoom_end}", debug_only=True)
+            
+            # Apply the update
             update_time_zoom((new_start, state.time_zoom_end))
-            state.nav_drag_start = x  # Update drag position
+            state.nav_drag_start = x_idx  # Update drag position
+            
         elif state.nav_resize_edge == 'right':
-            new_end = min(len(state.data_global) - 1, max(x, state.time_zoom_start + 10))
+            # Ensure minimum width and prevent crossing left edge
+            min_width = 10  # Minimum width of 10 data points
+            min_allowed_end = state.time_zoom_start + min_width
+            
+            # Restrict to valid range and prevent crossing left edge
+            new_end = min(data_length - 1, max(x_idx, min_allowed_end))
+            
+            # Log the resize operation
+            add_log_entry(f"Nav resize right edge to x={x_idx}, setting view: {state.time_zoom_start}-{new_end}", debug_only=True)
+            
+            # Apply the update
             update_time_zoom((state.time_zoom_start, new_end))
-            state.nav_drag_start = x  # Update drag position
+            state.nav_drag_start = x_idx  # Update drag position
 
 def on_nav_release(event):
     """Handle mouse release on navigation spectrogram"""
