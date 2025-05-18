@@ -4,17 +4,18 @@ ui_components.py - UI setup, layout, and configuration
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.widgets import Button, SpanSelector, RangeSlider
+from matplotlib.widgets import Button, SpanSelector, RangeSlider, CheckButtons
 import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import os
+import pytz
 
 # Import state directly
 import state
 
 from utils import add_log_entry, format_nav_time_axis, update_log_display
-from visualization import update_fft, update_fft_range, normalize_spectrogram_data, update_time_zoom, fix_spectrogram
+from visualization import update_fft, update_fft_range, normalize_spectrogram_data, update_time_zoom, fix_spectrogram, update_comment_markers
 
 def create_menu_ui():
     """Create the file menu UI elements as a horizontal button bar"""
@@ -50,20 +51,14 @@ def create_menu_ui():
     btn_load.on_clicked(on_load_project)
     button_list.append(btn_load)
     
-    # Create the Export Data button with highlight color
+    # Create the Export Data button
     ax_export = state.fig.add_axes([0.01 + 3 * (button_width + button_margin), 
                                   top_position, button_width, button_height])
-    btn_export = Button(ax_export, 'Export', color='#ccffcc')  # Light green for visibility
-    btn_export.label.set_fontweight('bold')  # Make text bold
+    btn_export = Button(ax_export, 'Export', color='#e6f0ff')  # Same color as other buttons
     btn_export.on_clicked(on_export_data)
     button_list.append(btn_export)
     
-    # Create the View Debug Logs button
-    ax_view_logs = state.fig.add_axes([0.01 + 4 * (button_width + button_margin), 
-                                     top_position, button_width, button_height])
-    btn_view_logs = Button(ax_view_logs, 'View Logs', color='#e6f0ff')
-    btn_view_logs.on_clicked(on_view_debug_logs)
-    button_list.append(btn_view_logs)
+    # View Logs button removed as per request
     
     # Store buttons in state for potential future reference
     state.menu_buttons = button_list
@@ -130,26 +125,37 @@ def create_gain_controls():
     ax_min_down = state.fig.add_axes([btn_left, btn_y[3], btn_width, btn_height])
     
     # Create buttons with light gray background for better hover detection
-    btn_max_up = Button(ax_max_up, '+Max', color='0.85')
-    btn_max_down = Button(ax_max_down, '-Max', color='0.85')
-    btn_min_up = Button(ax_min_up, '+Min', color='0.85')
-    btn_min_down = Button(ax_min_down, '-Min', color='0.85')
+    state.btn_max_up = Button(ax_max_up, '+Max', color='0.85')
+    state.btn_max_down = Button(ax_max_down, '-Max', color='0.85')
+    state.btn_min_up = Button(ax_min_up, '+Min', color='0.85')
+    state.btn_min_down = Button(ax_min_down, '-Min', color='0.85')
     
     # Direct button handlers that manipulate the spectrogram directly
     def on_max_up(event):
         try:
+            add_log_entry("+Max button clicked")
+            
+            # Check if gain_slider exists
+            if not hasattr(state, 'gain_slider') or state.gain_slider is None:
+                add_log_entry("Error: Gain slider not initialized")
+                return
+                
             # Get current values
             lo, hi = state.gain_slider.val
             # Increase max value
             new_hi = hi + 0.1
             # Apply to slider and spectrogram
             state.gain_slider.set_val((lo, new_hi))
-            if state.spec_img:
+            if hasattr(state, 'spec_img') and state.spec_img:
                 state.spec_img.set_clim(lo, new_hi)
                 add_log_entry(f"Max gain increased to {new_hi:.2f}")
+            else:
+                add_log_entry("Warning: spec_img not available")
             plt.draw()
         except Exception as e:
             add_log_entry(f"Error in +Max button: {str(e)}")
+            import traceback
+            add_log_entry(f"Traceback: {traceback.format_exc()}")
     
     def on_max_down(event):
         try:
@@ -197,10 +203,10 @@ def create_gain_controls():
             add_log_entry(f"Error in -Min button: {str(e)}")
     
     # Connect the button handlers
-    btn_max_up.on_clicked(on_max_up)
-    btn_max_down.on_clicked(on_max_down)
-    btn_min_up.on_clicked(on_min_up)
-    btn_min_down.on_clicked(on_min_down)
+    state.btn_max_up.on_clicked(on_max_up)
+    state.btn_max_down.on_clicked(on_max_down)
+    state.btn_min_up.on_clicked(on_min_up)
+    state.btn_min_down.on_clicked(on_min_down)
     
     # Connect our direct updater rather than going through the visualization module
     state.gain_slider.on_changed(direct_update_gain)
@@ -210,10 +216,6 @@ def create_gain_controls():
 
 def create_nav_controls():
     """Create navigation and zoom control buttons"""
-    # Check if buttons were already created by state_buttons_fix
-    if hasattr(state, 'btn_zoom_in') and state.btn_zoom_in is not None:
-        add_log_entry("Navigation controls already created by state_buttons_fix")
-        return
         
     zoom_section_y = 0.52  # Starting Y position for zoom controls
     
@@ -226,6 +228,15 @@ def create_nav_controls():
     def on_zoom_in(event):
         """Zoom in on time axis"""
         try:
+            # Check if data is available
+            if not hasattr(state, 'data_global') or state.data_global is None:
+                add_log_entry("Error: No data loaded for zoom")
+                return
+                
+            if not hasattr(state, 'time_zoom_start') or not hasattr(state, 'time_zoom_end'):
+                add_log_entry("Error: Zoom variables not initialized")
+                return
+                
             current_span = state.time_zoom_end - state.time_zoom_start
             center = (state.time_zoom_start + state.time_zoom_end) / 2
             
@@ -238,6 +249,8 @@ def create_nav_controls():
             update_time_zoom((new_start, new_end))
         except Exception as e:
             add_log_entry(f"Error in Zoom In button: {str(e)}")
+            import traceback
+            add_log_entry(f"Traceback: {traceback.format_exc()}")
     
     def on_zoom_out(event):
         """Zoom out on time axis"""
@@ -309,41 +322,37 @@ def create_nav_controls():
     
     # Zoom buttons in a logical layout
     ax_zoom_in = state.fig.add_axes([0.82, zoom_section_y, 0.06, 0.03])
-    btn_zoom_in = Button(ax_zoom_in, 'Zoom In', color='0.85')
-    btn_zoom_in.on_clicked(on_zoom_in)
+    state.btn_zoom_in = Button(ax_zoom_in, 'Zoom In', color='0.85')
+    state.btn_zoom_in.on_clicked(on_zoom_in)
     
     ax_zoom_out = state.fig.add_axes([0.89, zoom_section_y, 0.06, 0.03])
-    btn_zoom_out = Button(ax_zoom_out, 'Zoom Out', color='0.85')
-    btn_zoom_out.on_clicked(on_zoom_out)
+    state.btn_zoom_out = Button(ax_zoom_out, 'Zoom Out', color='0.85')
+    state.btn_zoom_out.on_clicked(on_zoom_out)
     
     # Pan buttons below zoom
     ax_pan_left = state.fig.add_axes([0.82, zoom_section_y - 0.04, 0.06, 0.03])
-    btn_pan_left = Button(ax_pan_left, '◀ Pan', color='0.85')
-    btn_pan_left.on_clicked(on_pan_left)
+    state.btn_pan_left = Button(ax_pan_left, '◀ Pan', color='0.85')
+    state.btn_pan_left.on_clicked(on_pan_left)
     
     ax_pan_right = state.fig.add_axes([0.89, zoom_section_y - 0.04, 0.06, 0.03])
-    btn_pan_right = Button(ax_pan_right, 'Pan ▶', color='0.85')
-    btn_pan_right.on_clicked(on_pan_right)
+    state.btn_pan_right = Button(ax_pan_right, 'Pan ▶', color='0.85')
+    state.btn_pan_right.on_clicked(on_pan_right)
     
     # Reset button centered below pan buttons
     ax_zoom_reset = state.fig.add_axes([0.855, zoom_section_y - 0.08, 0.08, 0.03])
-    btn_zoom_reset = Button(ax_zoom_reset, 'Reset Zoom', color='0.85')
-    btn_zoom_reset.on_clicked(on_reset_zoom)
+    state.btn_zoom_reset = Button(ax_zoom_reset, 'Reset Zoom', color='0.85')
+    state.btn_zoom_reset.on_clicked(on_reset_zoom)
     
     add_log_entry("Navigation controls created")
 
 def create_audio_controls():
     """Create audio control buttons and sliders"""
-    # Check if buttons were already created and fixed by state_buttons_fix
-    if hasattr(state, 'btn_audio_load') and state.btn_audio_load is not None and hasattr(state, 'btn_audio_load') and hasattr(state.btn_audio_load, '_connection_id') and state.btn_audio_load._connection_id is not None:
-        add_log_entry("Audio controls already created and fixed by state_buttons_fix")
-        return
         
     # Import event handlers here to avoid circular imports
     from event_handlers import on_load_audio, on_play_audio
     
-    # Audio controls section - in bottom right corner
-    audio_section_y = 0.32  # Starting Y position for audio controls
+    # Audio controls section - moved lower to create separation from navigation
+    audio_section_y = 0.32  # Create more space from navigation controls
     
     # Add section label for audio controls
     state.fig.text(0.885, audio_section_y + 0.05, 'Audio Controls', fontsize=10, 
@@ -364,18 +373,19 @@ def create_audio_controls():
     def update_volume(val):
         """Update the audio volume level"""
         state.audio_volume = val
-        # Update volume display
-        if state.ax_vu_meter:
-            state.ax_vu_meter.set_title(f'Volume: {int(state.audio_volume * 100)}%', fontsize=9, pad=4)
-            plt.draw()
+        # Update volume in label since VU meter is removed
+        if hasattr(state, 'volume_label'):
+            state.volume_label.set_text(f'Volume: {int(state.audio_volume * 100)}%')
+        plt.draw()
     
     state.volume_slider = plt.Slider(state.ax_volume_slider, '', 0.0, 3.0, valinit=state.audio_volume,
                               valstep=0.1, color='blue')
     state.volume_slider.on_changed(update_volume)
     
     # Add volume label above the slider
-    state.fig.text(0.885, audio_section_y - 0.03, 'Volume', fontsize=9, 
+    volume_label = state.fig.text(0.885, audio_section_y - 0.03, 'Volume: 100%', fontsize=9, 
              ha='center', va='bottom')
+    state.volume_label = volume_label  # Store reference for updates
     
     # Time display - create with persistent text object
     state.ax_time_display = state.fig.add_axes([0.82, audio_section_y - 0.09, 0.14, 0.03], 
@@ -397,52 +407,23 @@ def create_audio_controls():
     state.ax_audio_visualizer.grid(True, alpha=0.3)
     state.ax_audio_visualizer.tick_params(axis='both', which='both', labelsize=6)
     
-    # VU meter display - with pre-created scale labels
-    state.ax_vu_meter = state.fig.add_axes([0.82, audio_section_y - 0.24, 0.14, 0.05],
-                              frameon=True, facecolor='black')
-    state.ax_vu_meter.set_title(f'VU Meter - Volume: {int(state.audio_volume * 100)}%', fontsize=9, pad=4)
-    state.ax_vu_meter.set_xlim(-60, 0)
-    state.ax_vu_meter.set_ylim(0, 1)
-    state.ax_vu_meter.set_yticks([])
-    state.ax_vu_meter.tick_params(axis='x', which='both', labelsize=6)
-    state.ax_vu_meter.spines['top'].set_visible(False)
-    state.ax_vu_meter.spines['right'].set_visible(False)
-    state.ax_vu_meter.spines['left'].set_visible(False)
-    
-    # Pre-create scale labels that won't be removed during updates
-    for db in [-60, -40, -20, -10, -6, -3, 0]:
-        state.ax_vu_meter.text(db, 0.05, f'{db}', ha='center', va='bottom', 
-                       color='white', fontsize=7, zorder=20)
+    # VU meter removed - space now available for comment display
 
 def create_log_display():
     """Create the log display area and controls"""
-    # Check if buttons were already created by state_buttons_fix
-    if hasattr(state, 'btn_log_up') and state.btn_log_up is not None:
-        add_log_entry("Log controls already created by state_buttons_fix")
-        
-        # Still create the log display area if not already created
-        if not hasattr(state, 'ax_log') or state.ax_log is None:
-            state.ax_log = state.fig.add_axes([0.05, 0.02, 0.72, 0.08], frameon=True, facecolor='#e0e0e0')
-            state.ax_log.set_title("Log", fontsize=9, pad=4, color='black')
-            state.ax_log.axis("off")
-            
-            # Initialize the log display
-            update_log_display()
-        
-        return
     
     # Import event handlers here to avoid circular imports
     from event_handlers import scroll_log_up, scroll_log_down
     
-    # Create scrollable log with grey background - adjusted to avoid audio conflicts
-    state.ax_log = state.fig.add_axes([0.05, 0.02, 0.72, 0.08], frameon=True, facecolor='#e0e0e0')
+    # Create scrollable log with grey background - make it taller
+    state.ax_log = state.fig.add_axes([0.05, 0.02, 0.36, 0.13], frameon=True, facecolor='#e0e0e0')
     state.ax_log.set_title("Log", fontsize=9, pad=4, color='black')
     state.ax_log.axis("off")
     
-    # Create scroll buttons for log - moved to the left side
-    ax_log_up = state.fig.add_axes([0.01, 0.07, 0.03, 0.025])
+    # Create scroll buttons for log - adjusted for taller log
+    ax_log_up = state.fig.add_axes([0.01, 0.12, 0.03, 0.025])
     btn_log_up = Button(ax_log_up, '▲', color='0.85')
-    ax_log_down = state.fig.add_axes([0.01, 0.025, 0.03, 0.025])
+    ax_log_down = state.fig.add_axes([0.01, 0.07, 0.03, 0.025])
     btn_log_down = Button(ax_log_down, '▼', color='0.85')
     
     # Direct handlers for log scrolling
@@ -469,35 +450,16 @@ def create_log_display():
 
 def create_file_list():
     """Create the file list display and controls"""
-    # Check if buttons were already created by state_buttons_fix
-    if hasattr(state, 'btn_files_up') and state.btn_files_up is not None and hasattr(state, 'btn_clear_highlight') and state.btn_clear_highlight is not None:
-        add_log_entry("File list controls already created by state_buttons_fix")
-        
-        # Still create the file list area if not already created
-        if not hasattr(state, 'ax_filelist') or state.ax_filelist is None:
-            state.ax_filelist = state.fig.add_axes([0.82, 0.64, 0.14, 0.30], frameon=True, facecolor='#f0f0f0')
-            state.ax_filelist.set_title("Files", fontsize=9, pad=8)
-            state.ax_filelist.axis("off")
-            state.ax_filelist.set_facecolor('#f0f0f0')
-            
-            # Add border for clarity
-            for spine in state.ax_filelist.spines.values():
-                spine.set_visible(True)
-                spine.set_edgecolor('#d0d0d0')
-                spine.set_linewidth(1)
-            
-            # Initial file list display
-            from event_handlers import display_file_list
-            display_file_list()
-        
-        return
     
     # Import event handlers here to avoid circular imports
     from event_handlers import clear_file_highlight, display_file_list
     
-    # File list with scrollable area and more compact design
-    state.ax_filelist = state.fig.add_axes([0.82, 0.64, 0.14, 0.30], frameon=True, facecolor='#f0f0f0')
-    state.ax_filelist.set_title("Files", fontsize=9, pad=8)
+    # Add section label for file list
+    state.fig.text(0.885, 0.82, 'Files', fontsize=10, 
+                   weight='bold', ha='center', va='bottom')
+    
+    # File list with scrollable area and more compact design - reduce height to give more space to TZ
+    state.ax_filelist = state.fig.add_axes([0.82, 0.64, 0.14, 0.17], frameon=True, facecolor='#f0f0f0')
     state.ax_filelist.axis("off")
     state.ax_filelist.set_facecolor('#f0f0f0')
     
@@ -507,12 +469,16 @@ def create_file_list():
         spine.set_edgecolor('#d0d0d0')
         spine.set_linewidth(1)
     
-    # File list scroll buttons with custom styling
-    ax_files_up = state.fig.add_axes([0.96, 0.92, 0.02, 0.025])
-    ax_files_down = state.fig.add_axes([0.96, 0.65, 0.02, 0.025])
+    # File list scroll buttons with custom styling - moved inside file list area
+    ax_files_up = state.fig.add_axes([0.93, 0.785, 0.02, 0.025])
+    ax_files_down = state.fig.add_axes([0.93, 0.645, 0.02, 0.025])
     
     btn_files_up = Button(ax_files_up, '▲', color='0.85')
     btn_files_down = Button(ax_files_down, '▼', color='0.85')
+    
+    # Store in state to prevent duplication
+    state.btn_files_up = btn_files_up
+    state.btn_files_down = btn_files_down
     
     # Direct scroll handlers
     def on_files_up(event):
@@ -541,18 +507,31 @@ def create_file_list():
     
     def on_clear_file(event):
         try:
-            if state.file_patch:
+            add_log_entry("Clear Highlight button clicked")
+            
+            if hasattr(state, 'file_patch') and state.file_patch:
                 try:
                     state.file_patch.remove()
                 except ValueError:
                     pass
                 state.file_patch = None
-            for txt in state.file_texts:
-                txt.set_backgroundcolor(None)
+                add_log_entry("Removed file patch")
+            else:
+                add_log_entry("No file patch to clear")
+                
+            if hasattr(state, 'file_texts'):
+                for txt in state.file_texts:
+                    txt.set_backgroundcolor(None)
+                add_log_entry(f"Cleared background from {len(state.file_texts)} file texts")
+            else:
+                add_log_entry("No file texts to clear")
+                
             plt.draw()
             add_log_entry("Cleared file highlight")
         except Exception as e:
             add_log_entry(f"Error clearing file highlight: {str(e)}")
+            import traceback
+            add_log_entry(f"Traceback: {traceback.format_exc()}")
     
     btn_clear.on_clicked(on_clear_file)
     
@@ -561,26 +540,35 @@ def create_file_list():
 
 def create_fft_controls():
     """Create FFT display controls with enhanced Y-axis controls"""
-    # Check if buttons were already created by state_buttons_fix
-    if hasattr(state, 'btn_fft_up') and state.btn_fft_up is not None:
-        add_log_entry("FFT controls already created by state_buttons_fix")
-        return
         
-    # Add section label for FFT Y controls
-    state.fig.text(0.06, 0.95, 'FFT Y Controls', fontsize=9, 
+    # Add section label for FFT Y controls - align with controls
+    state.fig.text(0.025, 0.95, 'FFT Y Controls', fontsize=9, 
                    weight='bold', ha='center', va='bottom')
     
     # Adjusting vertical scale buttons position to match FFT location
     btn_width = 0.04
     btn_height = 0.04
     
-    # Create axes for buttons
-    ax_max_up = state.fig.add_axes([0.03, 0.90, btn_width, btn_height])
-    ax_max_down = state.fig.add_axes([0.03, 0.85, btn_width, btn_height])
-    ax_min_up = state.fig.add_axes([0.03, 0.80, btn_width, btn_height])
-    ax_min_down = state.fig.add_axes([0.03, 0.75, btn_width, btn_height])
+    # Create axes for buttons - align with spectrogram controls
+    fft_btn_left = 0.005  # Same as spectrogram buttons
+    ax_max_up = state.fig.add_axes([fft_btn_left, 0.90, btn_width, btn_height])
+    ax_max_down = state.fig.add_axes([fft_btn_left, 0.85, btn_width, btn_height])
+    ax_min_up = state.fig.add_axes([fft_btn_left, 0.80, btn_width, btn_height])
+    ax_min_down = state.fig.add_axes([fft_btn_left, 0.75, btn_width, btn_height])
     # Make the Auto Y button the same size as other buttons to prevent overlap
-    ax_auto_y = state.fig.add_axes([0.03, 0.70, btn_width, btn_height])
+    ax_auto_y = state.fig.add_axes([fft_btn_left, 0.70, btn_width, btn_height])
+    
+    # Create gain slider for FFT - align with spectrogram slider
+    from matplotlib.widgets import RangeSlider
+    fft_slider_left = 0.045  # Same as spectrogram slider
+    ax_fft_gain = state.fig.add_axes([fft_slider_left, 0.70, 0.02, 0.23], facecolor='lightgray')
+    
+    # Initialize FFT gain slider with sensible defaults
+    fft_min = getattr(state, 'fft_ymin', 0)
+    fft_max = getattr(state, 'fft_ymax', 100)
+    state.fft_gain_slider = RangeSlider(ax_fft_gain, 'Gain', 0, max(200, fft_max*1.5), 
+                                       valinit=(fft_min, fft_max),
+                                       orientation='vertical')
     
     # Create buttons
     btn_max_up = Button(ax_max_up, '+Max', color='0.85')
@@ -599,36 +587,48 @@ def create_fft_controls():
     # Direct handlers
     def adjust_fft_max_up(event):
         try:
-            state.fft_ymax = max(state.fft_ymin + 10, state.fft_ymax + 10)
-            state.ax_fft.set_ylim(state.fft_ymin, state.fft_ymax)
-            add_log_entry(f"Increased FFT Y-max to {state.fft_ymax}")
+            lo, hi = state.fft_gain_slider.val
+            new_hi = hi + 10
+            state.fft_gain_slider.set_val((lo, new_hi))
+            state.fft_ymax = new_hi
+            state.ax_fft.set_ylim(lo, new_hi)
+            add_log_entry(f"Increased FFT Y-max to {new_hi}")
             plt.draw()
         except Exception as e:
             add_log_entry(f"Error adjusting FFT Y-max: {str(e)}")
     
     def adjust_fft_max_down(event):
         try:
-            state.fft_ymax = max(state.fft_ymin + 10, state.fft_ymax - 10)
-            state.ax_fft.set_ylim(state.fft_ymin, state.fft_ymax)
-            add_log_entry(f"Decreased FFT Y-max to {state.fft_ymax}")
+            lo, hi = state.fft_gain_slider.val
+            new_hi = max(lo + 10, hi - 10)
+            state.fft_gain_slider.set_val((lo, new_hi))
+            state.fft_ymax = new_hi
+            state.ax_fft.set_ylim(lo, new_hi)
+            add_log_entry(f"Decreased FFT Y-max to {new_hi}")
             plt.draw()
         except Exception as e:
             add_log_entry(f"Error adjusting FFT Y-max: {str(e)}")
             
     def adjust_fft_min_up(event):
         try:
-            state.fft_ymin = min(state.fft_ymax - 10, state.fft_ymin + 10)
-            state.ax_fft.set_ylim(state.fft_ymin, state.fft_ymax)
-            add_log_entry(f"Increased FFT Y-min to {state.fft_ymin}")
+            lo, hi = state.fft_gain_slider.val
+            new_lo = min(hi - 10, lo + 10)
+            state.fft_gain_slider.set_val((new_lo, hi))
+            state.fft_ymin = new_lo
+            state.ax_fft.set_ylim(new_lo, hi)
+            add_log_entry(f"Increased FFT Y-min to {new_lo}")
             plt.draw()
         except Exception as e:
             add_log_entry(f"Error adjusting FFT Y-min: {str(e)}")
             
     def adjust_fft_min_down(event):
         try:
-            state.fft_ymin = max(0, state.fft_ymin - 10)
-            state.ax_fft.set_ylim(state.fft_ymin, state.fft_ymax)
-            add_log_entry(f"Decreased FFT Y-min to {state.fft_ymin}")
+            lo, hi = state.fft_gain_slider.val
+            new_lo = max(0, lo - 10)
+            state.fft_gain_slider.set_val((new_lo, hi))
+            state.fft_ymin = new_lo
+            state.ax_fft.set_ylim(new_lo, hi)
+            add_log_entry(f"Decreased FFT Y-min to {new_lo}")
             plt.draw()
         except Exception as e:
             add_log_entry(f"Error adjusting FFT Y-min: {str(e)}")
@@ -636,9 +636,23 @@ def create_fft_controls():
     def auto_adjust_y(event):
         try:
             from visualization import auto_adjust_fft_range
+            state.fft_manual_gain = False  # Reset manual gain flag
             auto_adjust_fft_range()
         except Exception as e:
             add_log_entry(f"Error auto-adjusting FFT Y-axis: {str(e)}")
+    
+    # Add slider update function
+    def update_fft_gain(val):
+        """Direct update when FFT gain slider changes"""
+        lo, hi = val
+        state.fft_ymin = lo
+        state.fft_ymax = hi
+        state.fft_manual_gain = True  # Mark that user has manually adjusted gain
+        state.ax_fft.set_ylim(lo, hi)
+        plt.draw()
+    
+    # Connect slider to update function
+    state.fft_gain_slider.on_changed(update_fft_gain)
     
     # Connect handlers to buttons
     btn_max_up.on_clicked(adjust_fft_max_up)
@@ -673,35 +687,159 @@ def create_selection_span():
     return span
 
 def create_timezone_button():
-    """Create the timezone selection button"""
+    """Create the timezone control buttons for timezone selection"""
+    from utils import get_system_timezone
+    
     # Import at function level to avoid circular imports
-    from event_handlers import create_timezone_dropdown
+    from event_handlers import on_tz_file_clicked, on_tz_local_clicked, on_tz_user_clicked
     
-    # Timezone button on right - use state.fig instead of fig
-    state.ax_timezone = state.fig.add_axes([0.89, 0.965, 0.1, 0.025])
-    state.btn_timezone = Button(state.ax_timezone, 'Timezone: UTC', color='0.85')
+    # Get the system timezone if not already set
+    if state.system_timezone == pytz.UTC:
+        state.system_timezone = get_system_timezone()
     
-    def on_timezone_click(event):
+    # Timezone controls area title
+    state.fig.text(0.885, 0.94, 'Timezone Settings', fontsize=10, 
+                   weight='bold', ha='center', va='bottom')
+    
+    # Get readable timezone names
+    file_tz_name = "UTC"
+    try:
+        if hasattr(state.detected_file_timezone, 'zone'):
+            file_tz_name = state.detected_file_timezone.zone
+        else:
+            if hasattr(state.detected_file_timezone, 'key'):
+                file_tz_name = state.detected_file_timezone.key
+            else:
+                file_tz_name = str(state.detected_file_timezone)
+    except Exception:
+        file_tz_name = "UTC"
+    
+    system_tz_name = "Local"
+    try:
+        if hasattr(state.system_timezone, 'zone'):
+            system_tz_name = state.system_timezone.zone
+        else:
+            if hasattr(state.system_timezone, 'key'):
+                system_tz_name = state.system_timezone.key
+            else:
+                system_tz_name = str(state.system_timezone)
+    except Exception:
+        system_tz_name = "Local"
+    
+    # Create timezone control buttons
+    button_width = 0.14
+    button_height = 0.025  # Reduced height
+    button_margin = 0.003
+    
+    # Initialize which button is selected based on current state
+    if not hasattr(state, 'timezone_selection'):
+        # Initialize based on existing state
+        if state.use_local_timezone:
+            state.timezone_selection = 'local'
+        else:
+            state.timezone_selection = 'file'
+    
+    # Button 1: Detected File Timezone
+    state.ax_tz_file = state.fig.add_axes([0.82, 0.90, button_width, button_height])
+    file_label = f"File TZ: {file_tz_name.split('/')[-1]}"  # Single line
+    initial_file_color = '#90EE90' if state.timezone_selection == 'file' else '0.85'
+    state.btn_tz_file = Button(state.ax_tz_file, file_label, color=initial_file_color)
+    state.btn_tz_file.label.set_fontsize(10)  # Larger text
+    state.btn_tz_file.on_clicked(on_tz_file_clicked)
+    
+    # Button 2: Apply Local Timezone
+    state.ax_tz_local = state.fig.add_axes([0.82, 0.90 - button_height - button_margin, button_width, button_height])
+    local_label = f"Local TZ: {system_tz_name.split('/')[-1]}"  # Single line
+    initial_local_color = '#90EE90' if state.timezone_selection == 'local' else '0.85'
+    state.btn_tz_local = Button(state.ax_tz_local, local_label, color=initial_local_color)
+    state.btn_tz_local.label.set_fontsize(10)  # Larger text
+    state.btn_tz_local.on_clicked(on_tz_local_clicked)
+    
+    # Button 3: User Select Timezone
+    state.ax_tz_user = state.fig.add_axes([0.82, 0.90 - 2*(button_height + button_margin), button_width, button_height])
+    # Display current user timezone if one has been selected
+    if hasattr(state, 'user_selected_timezone') and state.user_selected_timezone:
         try:
-            create_timezone_dropdown()
-        except Exception as e:
-            add_log_entry(f"Error creating timezone dropdown: {str(e)}")
+            if hasattr(state.user_selected_timezone, 'zone'):
+                user_tz_name = state.user_selected_timezone.zone.split('/')[-1]
+            else:
+                user_tz_name = str(state.user_selected_timezone).split('/')[-1]
+        except:
+            user_tz_name = "None"
+    else:
+        user_tz_name = "None"
     
-    state.btn_timezone.on_clicked(on_timezone_click)
+    user_label = f"User TZ: {user_tz_name}"  # Single line
+    initial_user_color = '#90EE90' if state.timezone_selection == 'user' else '0.85'
+    state.btn_tz_user = Button(state.ax_tz_user, user_label, color=initial_user_color)
+    state.btn_tz_user.label.set_fontsize(10)  # Larger text
+    state.btn_tz_user.on_clicked(on_tz_user_clicked)
     
-    return state.btn_timezone
+    return None
+
+def update_timezone_button_states():
+    """Update the color states of timezone buttons based on current selection"""
+    # Define colors
+    inactive_color = '0.85'  # Light gray
+    active_color = '#90EE90'  # Light green
+    
+    # Update button colors based on selection
+    if hasattr(state, 'btn_tz_file') and state.btn_tz_file:
+        if state.timezone_selection == 'file':
+            state.btn_tz_file.color = active_color
+            # Also update the actual button widget
+            for widget in state.btn_tz_file.ax.get_children():
+                if hasattr(widget, 'set_facecolor'):
+                    widget.set_facecolor(active_color)
+        else:
+            state.btn_tz_file.color = inactive_color
+            for widget in state.btn_tz_file.ax.get_children():
+                if hasattr(widget, 'set_facecolor'):
+                    widget.set_facecolor(inactive_color)
+    
+    if hasattr(state, 'btn_tz_local') and state.btn_tz_local:
+        if state.timezone_selection == 'local':
+            state.btn_tz_local.color = active_color
+            for widget in state.btn_tz_local.ax.get_children():
+                if hasattr(widget, 'set_facecolor'):
+                    widget.set_facecolor(active_color)
+        else:
+            state.btn_tz_local.color = inactive_color
+            for widget in state.btn_tz_local.ax.get_children():
+                if hasattr(widget, 'set_facecolor'):
+                    widget.set_facecolor(inactive_color)
+    
+    if hasattr(state, 'btn_tz_user') and state.btn_tz_user:
+        if state.timezone_selection == 'user':
+            state.btn_tz_user.color = active_color
+            for widget in state.btn_tz_user.ax.get_children():
+                if hasattr(widget, 'set_facecolor'):
+                    widget.set_facecolor(active_color)
+        else:
+            state.btn_tz_user.color = inactive_color
+            for widget in state.btn_tz_user.ax.get_children():
+                if hasattr(widget, 'set_facecolor'):
+                    widget.set_facecolor(inactive_color)
+    
+    # Force redraw
+    if hasattr(state, 'fig') and state.fig:
+        plt.draw()
 
 def create_fix_spectrogram_button():
     """Create a button to reset the spectrogram if it displays incorrectly"""
-    # Check if button was already created by state_buttons_fix
-    if hasattr(state, 'btn_reset') and state.btn_reset is not None:
-        add_log_entry("Reset button already created by state_buttons_fix")
-        return None
         
-    # Create the button at a lower position to avoid clashing with gain slider
-    # Moved down and renamed to "Reset"
-    ax_fix = state.fig.add_axes([0.02, 0.21, 0.07, 0.03])
-    btn_fix = Button(ax_fix, 'Reset', color='0.85')
+    # Create the button inline with gain control buttons
+    gain_slider_left = 0.045
+    gain_slider_bottom = 0.30
+    gain_slider_height = 0.30
+    btn_width = 0.035
+    btn_height = 0.04
+    btn_left = gain_slider_left - btn_width - 0.005
+    btn_y = gain_slider_bottom + gain_slider_height * 0.05  # Below -Min button
+    
+    ax_fix = state.fig.add_axes([btn_left, btn_y, btn_width, btn_height])
+    btn_fix = Button(ax_fix, 'Auto G', color='0.85')
+    state.btn_fix = btn_fix  # Store button in state
     
     def on_reset(event):
         """Reset the spectrogram display"""
@@ -720,8 +858,15 @@ def setup_fft_display():
     state.ax_fft.set_title('FFT Slice', fontsize=12, color='#ffffff')
     state.ax_fft._current_title = 'FFT Slice'  # Track the current title
     state.ax_fft.grid(True, axis='y', linestyle='--', color='gray', alpha=0.3)
-    state.ax_fft.plot(state.freqs_global, state.data_global[0], color='lime')
+    
+    # Convert frequency to kHz for display
+    freqs_khz = [f/1000 for f in state.freqs_global]
+    state.ax_fft.plot(freqs_khz, state.data_global[0], color='lime')
     state.ax_fft.set_ylim(state.fft_ymin, state.fft_ymax)
+    
+    # Set appropriate labels positioned to avoid overlap
+    state.ax_fft.set_xlabel('Frequency (kHz)', fontsize=10, x=0.25, ha='center')
+    state.ax_fft.set_ylabel('Amplitude', fontsize=10)
 
 def setup_navigation_spectrogram():
     """Set up the navigation spectrogram display"""
@@ -732,16 +877,22 @@ def setup_navigation_spectrogram():
         vmin, vmax = 0.0, 0.5
     
     # Create the navigation spectrogram with data-driven color limits
+    # Use kHz for y-axis - divide frequency values by 1000
     state.nav_spec_img = state.ax_nav_spec.imshow(
         state.data_global.T,
         aspect='auto', origin='lower',
-        extent=[0, state.data_global.shape[0]-1, state.freqs_global[0], state.freqs_global[-1]],
+        extent=[0, state.data_global.shape[0]-1, state.freqs_global[0]/1000, state.freqs_global[-1]/1000],
         cmap='viridis',
         vmin=vmin, vmax=vmax,
         alpha=0.7  # Slightly transparent to help highlight stand out
     )
-    state.ax_nav_spec.set_title('Navigation View (click/drag/scroll to navigate)', fontsize=9)
-    state.ax_nav_spec.set_ylabel('Freq (Hz)', fontsize=8)
+    state.ax_nav_spec.set_title('Navigation View', fontsize=9)
+    state.ax_nav_spec.set_ylabel('Freq (kHz)', fontsize=8)
+    # Add navigation instructions in a separate text at the right side
+    state.ax_nav_spec.text(0.98, 0.98, 'click/drag/scroll to navigate', 
+                          transform=state.ax_nav_spec.transAxes,
+                          fontsize=7, ha='right', va='top',
+                          bbox=dict(facecolor='white', alpha=0.7, pad=2))
     state.ax_nav_spec.tick_params(axis='both', which='major', labelsize=8)
     
     # Add time formatting to navigation x-axis
@@ -799,7 +950,8 @@ def setup_navigation_spectrogram():
     
     # Make navigation spectrogram stay at full view
     state.ax_nav_spec.set_xlim(0, state.data_global.shape[0]-1)
-    state.ax_nav_spec.set_ylim(state.freqs_global[0], state.freqs_global[-1])
+    # Use kHz for y-axis
+    state.ax_nav_spec.set_ylim(state.freqs_global[0]/1000, state.freqs_global[-1]/1000)
 
 def setup_main_spectrogram():
     """Set up the main spectrogram display"""
@@ -816,11 +968,12 @@ def setup_main_spectrogram():
     add_log_entry(f"Setting up spectrogram with data-driven range: {vmin:.4f}-{vmax:.4f}")
     
     # Create spectrogram with data-driven limits
+    # Use kHz for y-axis - divide frequency values by 1000
     state.spec_img = state.ax_spec.imshow(
         state.data_global.T,
         aspect='auto', 
         origin='lower',
-        extent=[0, state.data_global.shape[0]-1, state.freqs_global[0], state.freqs_global[-1]],
+        extent=[0, state.data_global.shape[0]-1, state.freqs_global[0]/1000, state.freqs_global[-1]/1000],
         cmap='viridis',
         vmin=vmin,
         vmax=vmax
@@ -838,6 +991,18 @@ def setup_main_spectrogram():
     
     # Set up time axis formatting
     update_spectrogram_xaxis()
+    
+    # Remove bottom margin to eliminate gap
+    state.ax_spec.set_position([state.ax_spec.get_position().x0,
+                               state.ax_spec.get_position().y0,
+                               state.ax_spec.get_position().width,
+                               state.ax_spec.get_position().height])
+    state.ax_spec.margins(x=0, y=0)
+    state.ax_spec.set_adjustable('box')
+    
+    # Also remove bottom tick padding
+    state.ax_spec.tick_params(axis='x', bottom=False, labelbottom=False, length=0, pad=0)
+    state.ax_spec.spines['bottom'].set_visible(False)
     
     # Connect timeline hover event for audio timeline
     state.fig.canvas.mpl_connect('motion_notify_event', on_timeline_hover)
@@ -877,3 +1042,234 @@ def display_file_list():
                        fontsize=6, ha='right', va='bottom', color='gray')
     
     plt.draw()
+
+def create_comment_section():
+    """Create the comment section UI elements"""
+    
+    # Position all comment controls slightly higher to be closer to audio timeline
+    bottom_offset = 0.07  # Move up moderately from bottom
+    
+    # Toggle Comments button - positioned below the "Comments" title
+    # Get spectrogram position to align with Comments label (similar to visualization.py)
+    spec_pos = state.ax_spec.get_position()
+    timeline_height = 0.055
+    timeline_bottom = spec_pos.y0 - timeline_height
+    
+    # Position button directly below "Comments" label
+    button_x = spec_pos.x0 - 0.062  # Adjust to align with right-aligned Comments text  
+    button_y = timeline_bottom + timeline_height * 0.25  # Lower position to avoid clashing
+    
+    ax_toggle_comments = state.fig.add_axes([button_x, button_y, 0.052, 0.018])
+    state.btn_toggle_comments = Button(ax_toggle_comments, 'Hide/Show', color='0.85')
+    state.btn_toggle_comments.label.set_fontsize(7)
+    
+    # Add button - below toggle
+    ax_add_comment = state.fig.add_axes([0.420, bottom_offset, 0.035, 0.020])
+    state.btn_add_comment = Button(ax_add_comment, 'Add', color='0.85')
+    state.btn_add_comment.label.set_fontsize(8)
+    
+    # Delete button - next to add
+    ax_delete_comment = state.fig.add_axes([0.460, bottom_offset, 0.035, 0.020])
+    state.btn_delete_comment = Button(ax_delete_comment, 'Delete', color='0.85')
+    state.btn_delete_comment.label.set_fontsize(8)
+    
+    # Comment input field - to the right of buttons
+    from matplotlib.widgets import TextBox
+    ax_comment_input = state.fig.add_axes([0.500, bottom_offset + 0.020, 0.100, 0.020])
+    state.comment_input = TextBox(ax_comment_input, '', initial='Comment (24 chars)')
+    state.comment_input.label.set_fontsize(8)
+    
+    # Extended notes input field - below comment
+    ax_notes_input = state.fig.add_axes([0.500, bottom_offset, 0.145, 0.018])
+    state.notes_input = TextBox(ax_notes_input, '', initial='Extended notes...')
+    state.notes_input.label.set_fontsize(8)
+    
+    # Apply performance optimizations - disable blitting to reduce lag
+    from textbox_simple_fix import setup_performant_textboxes
+    setup_performant_textboxes(state)
+    
+    # Save Comment button - to the right
+    ax_save_comment = state.fig.add_axes([0.605, bottom_offset + 0.020, 0.040, 0.020])
+    state.btn_save_comment = Button(ax_save_comment, 'Save', color='lightgreen')
+    state.btn_save_comment.label.set_fontsize(8)
+    
+    # Comment display window - moved down and further right
+    ax_comment_display = state.fig.add_axes([0.82, 0.01, 0.17, 0.10], frameon=True, facecolor='#f8f8f8')
+    state.ax_comment_display = ax_comment_display
+    ax_comment_display.axis("off")
+    
+    # Add border for clarity
+    for spine in ax_comment_display.spines.values():
+        spine.set_visible(True)
+        spine.set_edgecolor('#d0d0d0')
+        spine.set_linewidth(1)
+    
+    # Add title above comment display - adjusted for new position
+    state.fig.text(0.905, 0.115, 'Selected Comment', fontsize=9, 
+                   weight='bold', ha='center', va='bottom')
+    
+    # Add section title above comment input area (adjusted for new position)
+    state.fig.text(0.570, bottom_offset + 0.046, 'Comment Entry', fontsize=8, 
+                   weight='bold', ha='center', va='bottom')
+    
+    # Remove the old text display since we have a new comment display window
+    if hasattr(state, 'ax_comment_text') and state.ax_comment_text is not None:
+        state.ax_comment_text.remove()
+    
+    # Add placeholder event handlers (no logic yet)
+    def on_toggle_comments(event):
+        from visualization import update_comment_markers
+        
+        # Toggle visibility state
+        state.comments_visible = not state.comments_visible
+        add_log_entry(f"Comments visibility: {'ON' if state.comments_visible else 'OFF'}")
+        
+        # Update comment timeline visualization
+        update_comment_markers()
+        
+        # Update button text to show current state
+        if state.comments_visible:
+            state.btn_toggle_comments.label.set_text('Hide Comments')
+        else:
+            state.btn_toggle_comments.label.set_text('Show Comments')
+        plt.draw()
+    
+    def on_add_comment(event):
+        add_log_entry("Add comment button clicked")
+        try:
+            # Release any existing mouse grabs to prevent conflicts
+            try:
+                event.canvas.release_mouse(event.inaxes)
+            except:
+                pass  # Ignore if no grab exists
+                
+            from visualization import display_selected_comment
+            
+            # Store the current range for the new comment
+            start_idx = None
+            end_idx = None
+            
+            # Check for selected range first
+            if state.selected_range is not None:
+                start_idx, end_idx = state.selected_range
+                add_log_entry(f"Using selected range: {start_idx}-{end_idx}")
+            # Check for current click position
+            elif hasattr(state, 'spec_click_line') and state.spec_click_line is not None:
+                click_pos = int(state.spec_click_line.get_xdata()[0])
+                # Create a small range around the click (±5 samples)
+                start_idx = max(0, click_pos - 5)
+                end_idx = min(len(state.data_global) - 1, click_pos + 5)
+                add_log_entry(f"Using click position: {click_pos}, range: {start_idx}-{end_idx}")
+            else:
+                # Use center of current view
+                xlim = state.ax_spec.get_xlim()
+                center = int((xlim[0] + xlim[1]) / 2)
+                view_width = int((xlim[1] - xlim[0]) * 0.1)  # 10% of view width
+                start_idx = max(0, center - view_width // 2)
+                end_idx = min(len(state.data_global) - 1, center + view_width // 2)
+                add_log_entry(f"Using view center: {center}, range: {start_idx}-{end_idx}")
+            
+            # Store the range for when Save is clicked
+            state.pending_comment_range = (start_idx, end_idx)
+            
+            # Clear and focus the input field
+            state.comment_input.set_val('')
+            state.notes_input.set_val('')
+            
+            # Optimize TextBox focus to reduce lag
+            state.comment_input.cursor_index = 0
+            state.comment_input.capturekeyboard = True
+            
+            # Force focus without full redraw
+            if hasattr(state, 'fig'):
+                state.fig.canvas.draw_idle()  # Use draw_idle instead of draw
+            
+            add_log_entry("Ready to enter comment. Type comment and click Save.")
+            
+        except Exception as e:
+            add_log_entry(f"Error in on_add_comment: {str(e)}")
+            import traceback
+            add_log_entry(f"Traceback: {traceback.format_exc()}")
+    
+    def on_save_comment(event):
+        """Save the comment entered in the text fields"""
+        add_log_entry("Save comment button clicked")
+        try:
+            # Release any existing mouse grabs to prevent conflicts
+            try:
+                event.canvas.release_mouse(event.inaxes)
+            except:
+                pass  # Ignore if no grab exists
+            
+            from visualization import display_selected_comment
+            
+            if not hasattr(state, 'pending_comment_range'):
+                add_log_entry("No pending comment range. Click Add first.")
+                return
+                
+            start_idx, end_idx = state.pending_comment_range
+            comment_text = state.comment_input.text.strip()
+            notes_text = state.notes_input.text.strip()
+            
+            if not comment_text:
+                add_log_entry("Please enter a comment text.")
+                return
+            
+            # Enforce 24 character limit
+            if len(comment_text) > 24:
+                comment_text = comment_text[:24]
+                add_log_entry(f"Comment truncated to 24 characters: '{comment_text}'")
+            
+            add_log_entry(f"Saving comment: '{comment_text}' at range {start_idx}-{end_idx}")
+            
+            # Check for overlaps
+            overlapping_comments = []
+            for comment in state.comments:
+                if (start_idx <= comment['end_idx'] and end_idx >= comment['start_idx']):
+                    overlapping_comments.append(comment)
+            
+            # If overlaps exist, just log for now (could add confirmation later)
+            if overlapping_comments:
+                add_log_entry(f"Warning: Comment overlaps with {len(overlapping_comments)} existing comments")
+            
+            # Create new comment
+            new_comment = {
+                'id': state.comment_id_counter,
+                'start_idx': start_idx,
+                'end_idx': end_idx,
+                'text': comment_text,
+                'user_notes': notes_text
+            }
+            state.comments.append(new_comment)
+            state.comment_id_counter += 1
+            state.selected_comment_id = new_comment['id']
+            
+            # Clear input fields
+            state.comment_input.set_val('')
+            state.notes_input.set_val('')
+            delattr(state, 'pending_comment_range')
+            
+            # Update display
+            state.comments_visible = True
+            state.btn_toggle_comments.label.set_text('Hide Comments')
+            update_comment_markers()
+            display_selected_comment()
+            
+            add_log_entry(f"Comment saved successfully")
+            
+        except Exception as e:
+            add_log_entry(f"Error in on_save_comment: {str(e)}")
+            import traceback
+            add_log_entry(f"Traceback: {traceback.format_exc()}")
+    
+    def on_delete_comment(event):
+        add_log_entry("Delete Comment clicked - functionality to be implemented")
+        # Future: Delete selected comment
+    
+    # Connect handlers
+    state.btn_toggle_comments.on_clicked(on_toggle_comments)
+    state.btn_add_comment.on_clicked(on_add_comment)
+    state.btn_save_comment.on_clicked(on_save_comment)
+    state.btn_delete_comment.on_clicked(on_delete_comment)
+    
+    add_log_entry("Comment section UI created")

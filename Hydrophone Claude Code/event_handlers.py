@@ -663,6 +663,19 @@ def on_timezone_change(event):
             from visualization import update_audio_timeline_visualization
             update_audio_timeline_visualization()
         
+        # Update FFT display - both single point and range
+        if hasattr(state, 'spec_click_line') and state.spec_click_line:
+            # Single point FFT
+            idx = int(state.spec_click_line.get_xdata()[0])
+            from visualization import update_fft
+            update_fft(idx, state.freqs_global, state.data_global)
+        
+        # Update FFT title if it's showing a stacked range
+        if hasattr(state, 'selected_range') and state.selected_range:
+            start, end = state.selected_range
+            from visualization import update_fft_range
+            update_fft_range(start, end, state.freqs_global, state.data_global)
+        
         # Update button text
         if state.btn_timezone:
             state.btn_timezone.label.set_text(f'Timezone: {selected_tz_name.split("/")[-1]}')
@@ -671,37 +684,206 @@ def on_timezone_change(event):
         state.timezone_dropdown.master.destroy()
         
         add_log_entry(f"Timezone changed to {selected_tz_name}")
+        
+        # Force complete redraw to update all matplotlib elements
+        if hasattr(state, 'fig') and state.fig:
+            state.fig.canvas.draw_idle()
+        
         plt.draw()
         
     except Exception as e:
         add_log_entry(f"Error changing timezone: {str(e)}")
         logging.error(f"Error changing timezone", exc_info=True)
 
+def on_tz_file_clicked(event):
+    """Handle file timezone button click"""
+    if state.timezone_selection == 'file':
+        return  # Already selected
+    
+    state.timezone_selection = 'file'
+    state.use_local_timezone = False
+    state.current_timezone = state.detected_file_timezone
+    
+    # Update button states - this must be called to change colors
+    from ui_components import update_timezone_button_states
+    update_timezone_button_states()
+    
+    # Safely get timezone name
+    try:
+        if hasattr(state.detected_file_timezone, 'zone'):
+            file_tz_name = state.detected_file_timezone.zone
+        else:
+            file_tz_name = str(state.detected_file_timezone)
+    except Exception:
+        file_tz_name = "UTC"
+    
+    add_log_entry(f"Switched to file timezone: {file_tz_name}")
+    
+    # Update time displays
+    update_timezone_display()
+    
+    # Force complete redraw to ensure button colors update
+    if hasattr(state, 'fig') and state.fig:
+        state.fig.canvas.draw_idle()
+
+def on_tz_local_clicked(event):
+    """Handle local timezone button click"""
+    if state.timezone_selection == 'local':
+        return  # Already selected
+    
+    state.timezone_selection = 'local'
+    state.use_local_timezone = True
+    state.current_timezone = state.system_timezone
+    
+    # Update button states - this must be called to change colors
+    from ui_components import update_timezone_button_states
+    update_timezone_button_states()
+    
+    # Safely get timezone name
+    try:
+        if hasattr(state.system_timezone, 'zone'):
+            system_tz_name = state.system_timezone.zone
+        else:
+            system_tz_name = str(state.system_timezone)
+    except Exception:
+        system_tz_name = "Local"
+    
+    add_log_entry(f"Switched to local timezone: {system_tz_name}")
+    
+    # Update time displays
+    update_timezone_display()
+    
+    # Force complete redraw to ensure button colors update
+    if hasattr(state, 'fig') and state.fig:
+        state.fig.canvas.draw_idle()
+
+def on_tz_user_clicked(event):
+    """Handle user select timezone button click"""
+    # Create timezone selection dialog
+    from tkinter import Toplevel, Listbox, Scrollbar, SINGLE, END
+    
+    # Create dialog window
+    dialog = Toplevel()
+    dialog.title("Select Timezone")
+    dialog.geometry("300x400")
+    
+    # Create listbox with scrollbar
+    frame = tk.Frame(dialog)
+    frame.pack(fill=tk.BOTH, expand=1, padx=10, pady=10)
+    
+    scrollbar = Scrollbar(frame)
+    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    listbox = Listbox(frame, yscrollcommand=scrollbar.set, selectmode=SINGLE)
+    listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
+    scrollbar.config(command=listbox.yview)
+    
+    # Add all pytz timezones
+    tz_list = sorted(pytz.all_timezones)
+    for tz in tz_list:
+        listbox.insert(END, tz)
+    
+    # Set current selection if user timezone exists
+    if hasattr(state, 'user_selected_timezone') and state.user_selected_timezone:
+        try:
+            current_tz = state.user_selected_timezone.zone
+            index = tz_list.index(current_tz)
+            listbox.selection_set(index)
+            listbox.see(index)
+        except:
+            pass
+    
+    def on_select():
+        selection = listbox.curselection()
+        if selection:
+            tz_name = listbox.get(selection[0])
+            state.user_selected_timezone = pytz.timezone(tz_name)
+            state.timezone_selection = 'user'
+            state.current_timezone = state.user_selected_timezone
+            
+            # Update button label
+            if hasattr(state, 'btn_tz_user'):
+                user_label = f"User TZ: {tz_name.split('/')[-1]}"  # Single line
+                state.btn_tz_user.label.set_text(user_label)
+            
+            # Update button states - this must be called to change colors
+            from ui_components import update_timezone_button_states
+            update_timezone_button_states()
+            
+            add_log_entry(f"Switched to user-selected timezone: {tz_name}")
+            
+            # Update time displays
+            update_timezone_display()
+            
+            dialog.destroy()
+            
+            # Force complete redraw to ensure button colors update
+            if hasattr(state, 'fig') and state.fig:
+                state.fig.canvas.draw_idle()
+    
+    # Add select button
+    select_btn = tk.Button(dialog, text="Select", command=on_select)
+    select_btn.pack(pady=10)
+    
+    # Add cancel button
+    cancel_btn = tk.Button(dialog, text="Cancel", command=dialog.destroy)
+    cancel_btn.pack(pady=5)
+
+def update_timezone_display():
+    """Update all time-related displays after timezone change"""
+    try:
+        # Update time labels
+        update_time_labels_for_timezone()
+        
+        # Update x-axis display
+        update_spectrogram_xaxis()
+        
+        # Update click text if it exists
+        if state.spec_click_text and state.spec_click_line:
+            idx = int(state.spec_click_line.get_xdata()[0])
+            time_str = state.time_labels_all[idx]
+            display_time = time_str[:5] if time_str != "GAP" else "GAP"
+            state.spec_click_text.set_text(display_time)
+        
+        # Update audio timeline
+        if state.ax_audio_timeline:
+            # Import here to avoid circular import
+            from visualization import update_audio_timeline_visualization
+            update_audio_timeline_visualization()
+        
+        # Update FFT display - both single point and range
+        if hasattr(state, 'spec_click_line') and state.spec_click_line:
+            # Single point FFT
+            idx = int(state.spec_click_line.get_xdata()[0])
+            from visualization import update_fft
+            update_fft(idx, state.freqs_global, state.data_global)
+        
+        # Update FFT title if it's showing a stacked range
+        if hasattr(state, 'selected_range') and state.selected_range:
+            start, end = state.selected_range
+            from visualization import update_fft_range
+            update_fft_range(start, end, state.freqs_global, state.data_global)
+        
+        # Force complete redraw to update all matplotlib elements
+        if hasattr(state, 'fig') and state.fig:
+            state.fig.canvas.draw_idle()
+        
+        plt.draw()
+        
+    except Exception as e:
+        add_log_entry(f"Error updating timezone display: {str(e)}")
+        logging.error(f"Error updating timezone display", exc_info=True)
+
 def create_timezone_dropdown():
-    """Create dropdown menu for timezone selection"""
-    # Create a separate window for timezone selection
-    tz_window = tk.Toplevel()
-    tz_window.title("Select Timezone")
-    tz_window.geometry("300x100")
-    
-    # Create label
-    label = ttk.Label(tz_window, text="Select Timezone:")
-    label.pack(pady=10)
-    
-    # Get all timezone names
-    timezone_names = pytz.all_timezones
-    
-    # Create combobox
-    state.timezone_dropdown = ttk.Combobox(tz_window, values=timezone_names, state='readonly', width=30)
-    state.timezone_dropdown.set('UTC')  # Default to UTC
-    state.timezone_dropdown.pack(pady=10)
-    
-    # Bind change event
-    state.timezone_dropdown.bind('<<ComboboxSelected>>', on_timezone_change)
-    
-    # Position window
-    tz_window.update_idletasks()
-    tz_window.geometry("+{}+{}".format(100, 100))
+    """This function is deprecated but kept for backward compatibility"""
+    # Show a message indicating the functionality has changed
+    messagebox.showinfo(
+        "Timezone Selection", 
+        f"Timezone selection is now automatic.\n\n"
+        f"File timezone: {state.detected_file_timezone.zone}\n"
+        f"Local timezone: {state.system_timezone.zone}\n\n"
+        f"Use the checkbox to toggle between file timezone and local timezone."
+    )
 
 def on_load_audio(event):
     """Load audio files with timestamp-based alignment"""
@@ -859,9 +1041,10 @@ def on_spec_click(event):
                                          transform=blended_transform_factory(state.ax_spec.transData, state.ax_spec.transAxes),
                                          color='white', rotation=90, va='top', ha='center', clip_on=False)
             
-            # Auto-adjust the FFT Y-axis range for the selected point
-            from visualization import auto_adjust_fft_range
-            auto_adjust_fft_range()
+            # Auto-adjust the FFT Y-axis range for the selected point (only if not manually set)
+            if not state.fft_manual_gain:
+                from visualization import auto_adjust_fft_range
+                auto_adjust_fft_range()
             
         elif event.button == 3:
             if state.spec_click_line:
@@ -875,22 +1058,44 @@ def on_spec_click(event):
                 state.selected_range = (start, end)
                 update_fft_range(start, end, state.freqs_global, state.data_global)
                 
-                # Auto-adjust the FFT Y-axis range for the selected range
-                from visualization import auto_adjust_fft_range
-                auto_adjust_fft_range()
+                # Auto-adjust the FFT Y-axis range for the selected range (only if not manually set)
+                if not state.fft_manual_gain:
+                    from visualization import auto_adjust_fft_range
+                    auto_adjust_fft_range()
                 
     plt.draw()
 
 def on_click(event):
     """Handle mouse clicks with modifiers for frequency markers"""
     if event.key == 'control' and event.inaxes == state.ax_fft:
+        # The x-coordinate is already in kHz since we've updated the FFT display
+        # No need to convert here, the update_marker function will handle it
         if event.button == 1:
+            # Log the click for debugging
+            add_log_entry(f"Setting marker 1 at {event.xdata:.2f} kHz")
             update_marker(0, event.xdata)
         elif event.button == 3:
+            add_log_entry(f"Setting marker 2 at {event.xdata:.2f} kHz")
             update_marker(1, event.xdata)
 
 def on_key_press(event):
     """Handle keyboard shortcuts"""
+    # Check if comment input fields have focus - if so, ignore keyboard shortcuts
+    if hasattr(state, 'comment_input') and hasattr(state.comment_input, 'ax'):
+        # Check if the event originated from the comment input textbox
+        if state.comment_input.ax == event.inaxes:
+            return
+        # Also check if the textbox is currently active
+        if hasattr(state.comment_input, 'active') and state.comment_input.active:
+            return
+    if hasattr(state, 'notes_input') and hasattr(state.notes_input, 'ax'):
+        # Check if the event originated from the notes input textbox
+        if state.notes_input.ax == event.inaxes:
+            return
+        # Also check if the textbox is currently active
+        if hasattr(state.notes_input, 'active') and state.notes_input.active:
+            return
+    
     # Zoom controls with keyboard
     if event.key == '+' or event.key == '=':
         zoom_in_time(None)
@@ -992,7 +1197,7 @@ def display_file_list():
         return
     
     state.ax_filelist.clear()
-    state.ax_filelist.set_title("Files", fontsize=9, pad=8)
+    # Title is now set via fig.text in ui_components
     state.ax_filelist.axis("off")
     state.ax_filelist.set_facecolor('#f0f0f0')
     

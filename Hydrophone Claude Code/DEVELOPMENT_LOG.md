@@ -392,4 +392,111 @@ Each entry includes:
 **Next Steps**:
 1. Consider adding compression options for large exports
 2. Add options for customizing export fields
-3. Implement batch export functionality for multiple datasets
+3. Implement batch export functionality for multiple datasetsUI improvements completed on Sat May 17 22:15:40 AWST 2025
+
+### 2025-05-18: Comment System Keyboard/Mouse Conflict Fix
+
+**Developer**: Claude & User  
+**Type**: Bugfix  
+**Module(s)**: event_handlers.py, ui_components.py, visualization.py  
+**Description**:
+- Fixed critical issues with comment system where keyboard shortcuts interfered with comment entry
+- Resolved mouse grab conflicts that prevented saving comments after navigation
+- Implemented comprehensive fixes:
+  1. **Keyboard Shortcut Disabling:**
+     - Modified `on_key_press` in event_handlers.py to check if comment input fields have focus
+     - Added checks for both TextBox.ax and TextBox.active properties
+     - Keyboard shortcuts are now properly disabled when typing in comment fields
+  2. **Mouse Grab Release:**
+     - Added mouse grab release to all relevant button handlers
+     - Added release_mouse() call at the end of update_time_zoom
+     - Added try/catch blocks to handle cases where no grab exists
+  3. **UI Interaction Fixes:**
+     - Fixed "Another Axes already grabs mouse input" error
+     - Ensured smooth transition between navigation and comment entry
+
+**Test Results**:
+- Keyboard shortcuts (like 'a' and 'd' for panning) no longer interfere when typing comments
+- Mouse grab conflicts resolved - can save comments after keyboard navigation
+- Comment entry workflow now functions smoothly without errors
+
+**Issues**:
+- Problem was caused by matplotlib's event system not releasing mouse grabs after navigation
+- Keyboard events were still active when focus was on TextBox widgets
+- Multiple axes competing for mouse control caused RuntimeError
+
+**Next Steps**:
+1. Monitor for any additional interaction conflicts
+2. Consider implementing comment import from external files
+3. Add visual feedback for comment selection and editing
+
+### 2025-05-18: UI Layout Fixes
+
+**Developer**: Claude & User  
+**Type**: UI Enhancement  
+**Module(s)**: ui_components.py, visualization.py  
+**Description**:
+- Fixed UI placement issues based on user feedback and screenshot analysis
+- Major layout adjustments implemented:
+  1. **Comment Controls Repositioning:**
+     - Moved all comment controls to the very bottom of the screen (y=0.015)
+     - Reduced button heights to fit better in limited space
+     - Aligned save button with other comment controls
+     - Reduced comment display window height to fit at bottom
+  2. **Audio Controls Adjustments:**
+     - Moved audio controls lower (y=0.32) to create space from navigation
+     - This provides better visual separation between control groups
+  3. **Comment Timeline Height Fix:**
+     - Reduced comment timeline height from 0.10 to 0.035
+     - Eliminated large white space above comment controls
+     - Maintained visibility while maximizing spectrogram space
+  4. **Text Label Updates:**
+     - Adjusted all text labels to match new control positions
+     - Reduced font sizes slightly for better fit
+
+**Test Results**:
+- Comment controls now sit at the very bottom of the screen
+- White space above comments eliminated
+- Audio controls have proper separation from navigation
+- All UI elements properly aligned and sized
+
+**Issues**:
+- Previous layout had excessive whitespace due to oversized comment timeline
+- Comment controls were positioned too high on screen
+- Audio controls were too close to navigation controls
+
+**Next Steps**:
+1. Test with different screen resolutions
+2. Fine-tune text label positions if needed
+3. Consider making layout responsive to window resizing
+
+### 2025-05-18: Comment UI Layout Refinement
+
+**Developer**: Claude & User  
+**Type**: UI Enhancement  
+**Module(s)**: ui_components.py  
+**Description**:
+- Further refined comment UI layout based on user feedback
+- Major positioning adjustments:
+  1. **Comment Entry Fields:**
+     - Moved significantly up from y=0.015 to y=0.180
+     - Now positioned closer to audio timeline for better workflow
+  2. **Selected Comment Display:**
+     - Moved back to bottom right corner (x=0.78, y=0.02)
+     - Title positioned at y=0.16 to avoid clash with audio waveform
+  3. **Comment Entry Title:**
+     - Maintained center position above input fields
+
+**Test Results**:
+- Comment controls now have better visual association with timelines
+- Selected Comment display no longer conflicts with audio visualization
+- Improved overall layout balance and usability
+
+**Issues**:
+- Text input lag was addressed with performance optimizations
+- Layout was too spread out in previous iteration
+
+**Next Steps**:
+1. Continue monitoring text input performance
+2. Test comment workflow with new layout
+3. Consider additional visual indicators for comment associations
