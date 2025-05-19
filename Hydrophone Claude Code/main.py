@@ -171,7 +171,6 @@ try:
         setup_fft_display, setup_navigation_spectrogram, setup_main_spectrogram
     )
     from event_handlers import setup_event_handlers
-    from state_buttons_fix import apply_state_button_fix
 except Exception as e:
     log_exception(e, "Error importing application modules")
     print(f"Error importing application modules: {str(e)}")
@@ -193,6 +192,13 @@ def setup_viewer(file_paths):
         plt.rcParams['path.simplify'] = True
         plt.rcParams['path.simplify_threshold'] = 0.5
         plt.rcParams['agg.path.chunksize'] = 10000
+        plt.rcParams['path.snap'] = False  # Disable pixel snapping for smoother rendering
+        plt.rcParams['figure.max_open_warning'] = 0  # Disable figure warnings
+        
+        # Additional performance settings for text rendering
+        plt.rcParams['text.usetex'] = False  # Disable LaTeX rendering
+        plt.rcParams['text.antialiased'] = True  # Keep antialiasing for quality
+        plt.rcParams['mathtext.default'] = 'regular'  # Use simpler math text rendering
         
         # Create main figure with appropriate size
         fig = plt.figure(figsize=(12, 10))
@@ -381,9 +387,6 @@ def setup_viewer(file_paths):
         
         # Create audio timeline
         create_audio_timeline_axis()
-        
-        # Apply button fixes to ensure proper functionality
-        apply_state_button_fix()
         
         # Initially show a zoomed view to test the navigation
         initial_zoom_span = min(1000, len(state.data_global) // 4)

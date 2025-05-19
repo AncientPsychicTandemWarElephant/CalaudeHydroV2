@@ -417,7 +417,7 @@ def create_log_display():
     
     # Create scrollable log with grey background - make it taller
     state.ax_log = state.fig.add_axes([0.05, 0.02, 0.36, 0.13], frameon=True, facecolor='#e0e0e0')
-    state.ax_log.set_title("Log", fontsize=9, pad=4, color='black')
+    state.ax_log.set_title("Log", fontsize=10, pad=8, color='black', weight='bold', loc='left')
     state.ax_log.axis("off")
     
     # Create scroll buttons for log - adjusted for taller log
@@ -1072,6 +1072,9 @@ def create_comment_section():
     ax_delete_comment = state.fig.add_axes([0.460, bottom_offset, 0.035, 0.020])
     state.btn_delete_comment = Button(ax_delete_comment, 'Delete', color='0.85')
     state.btn_delete_comment.label.set_fontsize(8)
+    # Initially disable if no comment is selected
+    if not hasattr(state, 'selected_comment_id') or state.selected_comment_id is None:
+        state.btn_delete_comment.ax.set_alpha(0.5)  # Visual indication of disabled state
     
     # Comment input field - to the right of buttons
     from matplotlib.widgets import TextBox
@@ -1084,9 +1087,14 @@ def create_comment_section():
     state.notes_input = TextBox(ax_notes_input, '', initial='Extended notes...')
     state.notes_input.label.set_fontsize(8)
     
-    # Apply performance optimizations - disable blitting to reduce lag
-    from textbox_simple_fix import setup_performant_textboxes
-    setup_performant_textboxes(state)
+    # Apply consolidated performance optimizations
+    try:
+        from textbox_optimization import optimize_comment_textboxes
+        optimize_comment_textboxes(state)
+    except Exception as e:
+        # Log the error but don't fail
+        print(f"Warning: Could not apply text optimizations: {e}")
+        pass
     
     # Save Comment button - to the right
     ax_save_comment = state.fig.add_axes([0.605, bottom_offset + 0.020, 0.040, 0.020])
@@ -1263,8 +1271,18 @@ def create_comment_section():
             add_log_entry(f"Traceback: {traceback.format_exc()}")
     
     def on_delete_comment(event):
-        add_log_entry("Delete Comment clicked - functionality to be implemented")
-        # Future: Delete selected comment
+        """Delete the currently selected comment"""
+        add_log_entry("Delete comment button clicked")
+        
+        # Release any existing mouse grabs
+        try:
+            event.canvas.release_mouse(event.inaxes)
+        except:
+            pass
+        
+        # Use the centralized delete function
+        from comment_operations import delete_selected_comment
+        delete_selected_comment()
     
     # Connect handlers
     state.btn_toggle_comments.on_clicked(on_toggle_comments)

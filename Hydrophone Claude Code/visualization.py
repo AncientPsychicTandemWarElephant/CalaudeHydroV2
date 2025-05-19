@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import logging
 from matplotlib.transforms import blended_transform_factory
+from matplotlib.patches import Rectangle
+from matplotlib.ticker import FuncFormatter
 import time
 import os
 
@@ -375,6 +377,9 @@ def update_time_zoom(val):
         state.ax_audio_timeline.set_xlim(state.time_zoom_start, state.time_zoom_end)
         new_timeline_xlim = state.ax_audio_timeline.get_xlim()
         log_zoom_event(f"New timeline xlim: {new_timeline_xlim}")
+        
+        # Update the audio timeline visualization to ensure labels are properly drawn
+        update_audio_timeline_visualization()
     else:
         log_zoom_event("ax_audio_timeline is None or not accessible")
     
@@ -763,6 +768,13 @@ def update_comment_markers():
                 state.selected_comment_id = clicked_comment_id
                 display_selected_comment()
             
+            # Update delete button state
+            try:
+                from ui_state_updates import update_delete_button_state
+                update_delete_button_state(state)
+            except ImportError:
+                pass  # Module not available
+            
             update_comment_markers()
     
     state.fig.canvas.mpl_connect('pick_event', on_comment_click)
@@ -854,7 +866,7 @@ def create_audio_timeline_axis():
     timeline_height = 0.03
     
     state.ax_audio_timeline = state.fig.add_axes([spec_pos.x0, timeline_bottom, 
-                                      spec_pos.width, timeline_height], zorder=10)
+                                      spec_pos.width, timeline_height], zorder=10, sharex=None)
     state.ax_audio_timeline.set_xlim(state.ax_spec.get_xlim())
     state.ax_audio_timeline.set_ylim(0, 1)
     state.ax_audio_timeline.set_yticks([])
@@ -868,10 +880,22 @@ def create_audio_timeline_axis():
     state.ax_audio_timeline.spines['bottom'].set_visible(False)
     state.ax_audio_timeline.patch.set_facecolor('#d0d0d0')  # Darker gray for better contrast
     
+    # Ensure x-axis labels are visible
+    state.ax_audio_timeline.tick_params(axis='x', which='both', labelbottom=True, labelsize=9)
+    
+    # Enable clipping to prevent content from appearing outside timeline bounds
+    state.ax_audio_timeline.set_clip_on(True)
+    # Set clipping box to axis bounds
+    state.ax_audio_timeline.set_clip_box(state.ax_audio_timeline.bbox)
+    
     # Add label to the left of the timeline
     state.fig.text(spec_pos.x0 - 0.01, timeline_bottom + timeline_height/2, 
                    'Audio', fontsize=11, weight='bold', 
                    ha='right', va='center')
+    
+    # Don't set formatter here - let update_spectrogram_xaxis handle it
+    from utils import update_spectrogram_xaxis
+    update_spectrogram_xaxis()
     
     return state.ax_audio_timeline
 
@@ -880,19 +904,15 @@ def update_audio_timeline_visualization():
     if state.ax_audio_timeline is None:
         return
     
-    # Clear previous timeline
-    state.ax_audio_timeline.clear()
-    state.ax_audio_timeline.set_xlim(state.ax_spec.get_xlim())
-    state.ax_audio_timeline.set_ylim(0, 1)
-    state.ax_audio_timeline.set_yticks([])
-    # Keep x-axis for time labels
-    # No title here - it's drawn as a text element in create function
+    # Remove previous content without clearing axis formatting
+    for patch in state.ax_audio_timeline.patches[:]:
+        patch.remove()
+    for text in state.ax_audio_timeline.texts[:]:
+        text.remove()
+    for line in state.ax_audio_timeline.lines[:]:
+        line.remove()
     
-    # Style
-    state.ax_audio_timeline.spines['top'].set_visible(False)
-    state.ax_audio_timeline.spines['right'].set_visible(False)
-    state.ax_audio_timeline.spines['left'].set_visible(False)
-    state.ax_audio_timeline.patch.set_facecolor('#d0d0d0')  # Darker gray for better contrast
+    state.ax_audio_timeline.set_xlim(state.ax_spec.get_xlim())
     
     if not state.audio_segments:
         state.ax_audio_timeline.text(0.5, 0.5, 'No audio loaded', 
@@ -919,20 +939,36 @@ def update_audio_timeline_visualization():
             rect = plt.Rectangle((start_idx, 0.1), end_idx - start_idx, 0.8,
                                facecolor='#4CAF50', edgecolor='#2E7D32',
                                alpha=0.7)
+            rect.set_clip_on(True)
+            rect.set_clip_path(state.ax_audio_timeline.patch)
             state.ax_audio_timeline.add_patch(rect)
             
             # Add file number label
             center_idx = (start_idx + end_idx) / 2
-            state.ax_audio_timeline.text(center_idx, 0.5, f'Audio {i+1}',
+            
+            # Always create text object for all segments
+            text_obj = state.ax_audio_timeline.text(center_idx, 0.5, f'Audio {i+1}',
                                  ha='center', va='center', fontsize=8,
                                  color='white', weight='bold')
+            
+            # Apply clipping to handle visibility automatically
+            text_obj.set_clip_on(True)
+            text_obj.set_clip_path(state.ax_audio_timeline.patch)
     
     # Add grid lines to match spectrogram
     state.ax_audio_timeline.grid(True, axis='x', alpha=0.3, linestyle=':')
     
+    # Ensure timeline stays within bounds
+    state.ax_audio_timeline.set_xlim(state.ax_spec.get_xlim())
+    
     # Update the x-axis formatting to ensure time labels show
-    from utils import update_spectrogram_xaxis
+    from utils import update_spectrogram_xaxis, format_time_axis
+    from matplotlib.ticker import FuncFormatter
     update_spectrogram_xaxis()
+    
+    # Force formatter application one more time
+    formatter = FuncFormatter(format_time_axis)
+    state.ax_audio_timeline.xaxis.set_major_formatter(formatter)
     
     plt.draw()
 

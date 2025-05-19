@@ -21,7 +21,6 @@ import state
 
 from utils import add_log_entry, update_spectrogram_xaxis, update_time_labels_for_timezone, update_log_display
 from visualization import update_time_zoom, update_fft, update_fft_range
-from export_dialog import show_export_dialog
 
 # Import from audio_processing as needed
 from audio_processing import play_audio, stop_audio
@@ -268,11 +267,16 @@ def on_export_data(event):
                 input_files_list = '\n- '.join([os.path.basename(path) for path in state.file_paths])
                 input_files_summary += f"\nInput files:\n- {input_files_list}"
             
+            # Get original file timezone
+            original_tz = state.detected_file_timezone.zone if hasattr(state, 'detected_file_timezone') else 'Unknown'
+            export_tz = state.current_timezone.zone
+            
             # Format the export details message
             message = (f"Export completed successfully to:\n{export_dir}\n\n"
                       f"File created:\n{file_name}\n\n"
                       f"Project: {project_name}\n"
-                      f"Timezone: {state.current_timezone.zone}\n"
+                      f"Original file timezone: {original_tz}\n"
+                      f"Data exported using: {export_tz}\n"
                       f"Time Range: {time_range_info}\n"
                       f"Total Duration: {total_duration}\n\n"
                       f"Data Summary:\n"
@@ -1107,6 +1111,13 @@ def on_key_press(event):
         pan_left(None)
     elif event.key == 'd':
         pan_right(None)
+    
+    # Comment-related shortcuts
+    elif event.key == 'delete':
+        # Delete selected comment
+        if hasattr(state, 'selected_comment_id') and state.selected_comment_id is not None:
+            from comment_operations import delete_selected_comment
+            delete_selected_comment()
     
     # Original navigation controls
     elif state.spec_click_line is not None and event.key in ['left', 'right']:
