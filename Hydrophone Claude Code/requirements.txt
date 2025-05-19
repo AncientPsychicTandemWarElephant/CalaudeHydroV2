@@ -1,0 +1,8 @@
+numpy
+matplotlib
+logging
+traceback
+unittest
+# Optional: pytest
+# Optional: pandas
+# Optional: scipy
