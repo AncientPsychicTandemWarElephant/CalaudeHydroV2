@@ -168,6 +168,7 @@ After architectural improvements, focus on new features:
 | 2025-05-15 | Create testing methodology with logging verification | Improve feature stability and tracking     |
 | 2025-05-15 | Fix export file format to match original files     | Ensure compatibility for re-import functionality |
 | 2025-05-15 | Adjust UI layout with smaller buttons and repositioned title | Prevent title-button overlap with long project names |
+| 2025-05-19 | Implement textbox lag reduction strategies         | Improve comment input responsiveness       |
 
 ## Technical Debt Notes
 
@@ -176,6 +177,7 @@ After architectural improvements, focus on new features:
 - UI component creation is scattered across multiple functions
 - Error logging is extensive but recovery mechanisms are limited
 - State management is centralized but could benefit from better organization
+- TextBox widgets experience lag due to matplotlib redrawing behavior
 
 ## Next Steps
 

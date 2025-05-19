@@ -1087,14 +1087,24 @@ def create_comment_section():
     state.notes_input = TextBox(ax_notes_input, '', initial='Extended notes...')
     state.notes_input.label.set_fontsize(8)
     
-    # Apply consolidated performance optimizations
+    # Apply performance optimizations to reduce lag
     try:
-        from textbox_optimization import optimize_comment_textboxes
-        optimize_comment_textboxes(state)
+        # First try simple fix
+        from simple_textbox_fix import apply_simple_lag_fix
+        apply_simple_lag_fix(state)
     except Exception as e:
-        # Log the error but don't fail
-        print(f"Warning: Could not apply text optimizations: {e}")
-        pass
+        # Fallback to more aggressive optimization
+        try:
+            from textbox_lag_fix import apply_aggressive_optimization
+            apply_aggressive_optimization(state, use_fast_widget=False)
+        except Exception as e2:
+            # Fallback to standard optimization
+            try:
+                from textbox_optimization import optimize_comment_textboxes
+                optimize_comment_textboxes(state)
+            except Exception as e3:
+                print(f"Warning: Could not apply text optimizations: {e}, {e2}, {e3}")
+            pass
     
     # Save Comment button - to the right
     ax_save_comment = state.fig.add_axes([0.605, bottom_offset + 0.020, 0.040, 0.020])

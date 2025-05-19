@@ -11,6 +11,13 @@ import logging
 import traceback
 from datetime import datetime, timedelta
 
+# Apply global textbox optimization early to reduce lag
+try:
+    from textbox_lag_fix import patch_textbox_globally
+    patch_textbox_globally()
+except:
+    pass
+
 # ===== Configure Logging First =====
 # Remove old log file if it exists to start fresh
 log_filename = 'error_log.txt'
