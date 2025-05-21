@@ -1,0 +1,15 @@
+# Core dependencies
+numpy>=1.20.0
+matplotlib>=3.5.0
+pytz>=2021.1
+scipy>=1.7.0
+tkinter>=8.6.0  # Usually comes with Python installation
+
+# Optional dependencies
+tzlocal>=4.0.0  # For better timezone detection
+pillow>=8.0.0   # For image handling and visualization enhancements
+sounddevice>=0.4.0  # For audio playback capabilities
+
+# Development dependencies (not required for running)
+pytest>=6.0.0  # For running tests
+pylint>=2.8.0  # For code quality checks

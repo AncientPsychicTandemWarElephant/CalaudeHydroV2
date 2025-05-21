@@ -1,8 +1,9 @@
 """
-modal_comment_input.py - A modal dialog approach for comment entry
+modal_comment_input.py - Modal Dialog for Comment Entry
 
-This implements a popup modal dialog for comment entry, completely bypassing
-matplotlib's text input and event handling systems.
+This module provides a Tkinter-based modal dialog for comment entry and editing.
+It implements a clean, user-friendly interface that bypasses matplotlib's text
+input system for improved reliability and user experience.
 """
 
 import tkinter as tk
@@ -12,15 +13,21 @@ import state
 from utils import add_log_entry
 
 def show_comment_dialog(start_idx=None, end_idx=None, existing_comment=None):
-    """Show the comment dialog and return the result
+    """
+    Display a modal dialog for adding or editing a comment
     
     Args:
         start_idx: Start index for new comment
         end_idx: End index for new comment
-        existing_comment: Existing comment to edit
+        existing_comment: Existing comment to edit (dict with comment data)
         
     Returns:
-        Dict with comment data or None if canceled
+        Dict with comment data if saved, or None if canceled
+        
+    This function creates and manages a Tkinter-based modal dialog
+    that provides a user-friendly interface for entering comment
+    information. It handles both creating new comments and editing
+    existing ones, with appropriate form validation and UI feedback.
     """
     try:
         # Get valid indices if not provided
@@ -58,17 +65,22 @@ def show_comment_dialog(start_idx=None, end_idx=None, existing_comment=None):
         # Create a simple dialog and result variables
         result = [None]  # Use list to make it mutable from nested functions
                 
-        # Create the dialog window
+        # Create the dialog window with standard dimensions
         dialog = tk.Toplevel(root)
-        # Make dialog title more prominent
+        
+        # Set appropriate title based on operation
         dialog.title("ADD COMMENT" if not existing_comment else "EDIT COMMENT")
+        
+        # Try to remove default icon for cleaner appearance
         try:
             dialog.iconbitmap(default="")  # Remove the default tkinter icon
         except:
             pass  # Ignore if not supported on this platform
-        dialog.geometry("400x500")  # Significantly increase dialog height to guarantee button visibility
-        dialog.resizable(False, False)
-        dialog.transient(root)  # Dialog is dependent on parent
+            
+        # Configure dialog dimensions and behavior
+        dialog.geometry("400x500")  # Fixed size with enough height for all elements
+        dialog.resizable(False, False)  # Prevent resizing to ensure layout consistency
+        dialog.transient(root)  # Make dialog dependent on parent window
         
         # Comment data
         comment_text = ""

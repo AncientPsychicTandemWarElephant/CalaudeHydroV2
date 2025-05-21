@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
-main.py - Entry point for the Hydrophone Viewer application
-With updated keyboard shortcuts using 1.0 increments
+main.py - Hydrophone Analyzer Application Entry Point
+
+This module serves as the main entry point for the Hydrophone Analyzer application.
+It handles initial setup, dependency checking, file loading, and UI initialization.
+The application provides a comprehensive interface for analyzing hydrophone data
+with features for visualization, annotation, and data export.
 """
 
 import os
@@ -11,23 +15,24 @@ import logging
 import traceback
 from datetime import datetime, timedelta
 
-# Global textbox optimization disabled - using targeted fixes in ui_components
-# This prevents conflicts between multiple optimization layers
+# Application constants
+VERSION = "2.3.4"
+LOG_FILENAME = 'error_log.txt'
+DEFAULT_ZOOM_SPAN = 1000
 
 # ===== Configure Logging First =====
-# Remove old log file if it exists to start fresh
-log_filename = 'error_log.txt'
-if os.path.exists(log_filename):
+# Set up logging before importing other modules to capture all messages
+if os.path.exists(LOG_FILENAME):
     try:
-        os.remove(log_filename)
+        os.remove(LOG_FILENAME)
     except:
         # If we can't remove it, create a new one with a timestamp
         timestamp = time.strftime("%Y%m%d-%H%M%S")
-        log_filename = f'error_log_{timestamp}.txt'
+        LOG_FILENAME = f'error_log_{timestamp}.txt'
 
 # Configure a concise logger
 logging.basicConfig(
-    filename=log_filename,
+    filename=LOG_FILENAME,
     level=logging.ERROR,  # Only log errors and critical issues
     format='%(asctime)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
@@ -42,7 +47,17 @@ logging.getLogger('').addHandler(console)
 
 # Function to log exceptions with limited traceback
 def log_exception(e, message="An error occurred"):
-    """Log an exception with a limited traceback for brevity"""
+    """
+    Log an exception with a limited traceback for better readability
+    
+    Args:
+        e: The exception object to log
+        message: A descriptive message about the context of the error
+        
+    This function creates a concise error log by trimming the traceback
+    to include only the most relevant parts, making error diagnosis more
+    efficient while maintaining necessary context.
+    """
     tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
     # Only include the most relevant parts of the traceback
     if len(tb_lines) > 5:
@@ -91,7 +106,16 @@ try:
     
     # Define timezone helper function here to avoid circular imports
     def get_system_timezone():
-        """Get the system's local timezone"""
+        """
+        Get the system's local timezone with cross-platform compatibility
+        
+        Returns:
+            A pytz timezone object representing the local timezone
+            
+        This function handles different timezone representations across
+        platforms and Python versions, converting them to a consistent
+        pytz timezone object for use throughout the application.
+        """
         try:
             if 'tzlocal' in sys.modules:
                 local_tz = tzlocal.get_localzone()
@@ -180,7 +204,19 @@ except Exception as e:
     sys.exit(1)
 
 def setup_viewer(file_paths):
-    """Setup the main viewer with the given file paths"""
+    """
+    Initialize and configure the main application interface
+    
+    Args:
+        file_paths: List of paths to hydrophone data files to load
+        
+    This function performs the core application setup:
+    - Configures the matplotlib figure and axes
+    - Loads and processes hydrophone data files
+    - Sets up UI components and controls
+    - Initializes visualization elements
+    - Prepares comment and annotation systems
+    """
     try:
         print(f"Setting up viewer with {len(file_paths)} files")
         
@@ -354,7 +390,7 @@ def setup_viewer(file_paths):
         fig.text(0.5, 0.98, f'Project: {state.project_name}', fontsize=16, weight='bold', ha='center')
         
         # Version label
-        fig.text(0.99, 0.005, 'v2.3.4', fontsize=8, color='gray', ha='right', va='bottom')
+        fig.text(0.99, 0.005, f'v{VERSION}', fontsize=8, color='gray', ha='right', va='bottom')
         fig.subplots_adjust(top=0.96, bottom=0.11)
         
         # Setup UI components - function signatures no longer require fig parameter
@@ -395,8 +431,8 @@ def setup_viewer(file_paths):
         # Create audio timeline
         create_audio_timeline_axis()
         
-        # Initially show a zoomed view to test the navigation
-        initial_zoom_span = min(1000, len(state.data_global) // 4)
+        # Set initial view to a reasonable zoom level
+        initial_zoom_span = min(DEFAULT_ZOOM_SPAN, len(state.data_global) // 4)
         initial_zoom_start = 0
         initial_zoom_end = initial_zoom_span
         add_log_entry(f"Setting initial zoom to {initial_zoom_start}-{initial_zoom_end}")
@@ -442,7 +478,15 @@ def setup_viewer(file_paths):
         raise
 
 def main():
-    """Main entry point for the application"""
+    """
+    Main entry point for the Hydrophone Analyzer application
+    
+    This function handles:
+    - Initial environment and UI setup
+    - Command-line argument processing
+    - File selection dialog if no files are specified
+    - Application startup and exception handling
+    """
     try:
         # Create root window for dialogs but keep it hidden
         print("Starting Hydrophone Viewer application")
@@ -481,7 +525,7 @@ def main():
     except Exception as e:
         log_exception(e, "Error in main")
         print(f"An error occurred during startup: {str(e)}")
-        print(f"See {log_filename} for details.")
+        print(f"See {LOG_FILENAME} for details.")
         messagebox.showerror("Startup Error", f"An error occurred during startup: {str(e)}")
     
     # Ensure root is destroyed

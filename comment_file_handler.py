@@ -1,10 +1,15 @@
 """
-comment_file_handler.py - Functions for handling comment export and import to/from files
+comment_file_handler.py - Comment Export and Import Management
 
-This module contains functions for:
+This module manages the persistence of comments to allow sharing annotations
+between sessions and users. It provides functionality for:
+
 1. Exporting comments to external .comments.json files
-2. Importing comments from external .comments.json files
-3. Checking for existing comment files during data import
+2. Importing comments from .comments.json files
+3. Automatic detection and loading of comment files during data import
+
+The comment files use a standard JSON format with version tracking to ensure
+future compatibility as the application evolves.
 """
 
 import os
@@ -14,13 +19,19 @@ from utils import add_log_entry
 import state
 
 def export_comments_to_file(data_filepath):
-    """Export all comments to a .comments.json file associated with the data file
+    """
+    Export comments to a JSON file associated with the source data file
     
     Args:
         data_filepath: Path to the data file the comments are associated with
         
     Returns:
         bool: True if export was successful, False otherwise
+        
+    This function creates a companion .comments.json file that contains all
+    comment data in a structured format. The file is created alongside the
+    original data file and can be automatically detected and loaded when
+    the data file is opened in a future session.
     """
     try:
         # Check if we have any comments to export
@@ -60,7 +71,8 @@ def export_comments_to_file(data_filepath):
         return False
 
 def import_comments_from_file(comment_filepath, merge=True):
-    """Import comments from a .comments.json file
+    """
+    Import comments from a JSON comment file
     
     Args:
         comment_filepath: Path to the comment file
@@ -68,6 +80,11 @@ def import_comments_from_file(comment_filepath, merge=True):
         
     Returns:
         bool: True if import was successful, False otherwise
+        
+    This function loads comments from a .comments.json file, validates the data
+    structure, and either adds them to existing comments or replaces all comments.
+    It handles ID management, ensuring each comment has a unique identifier, and
+    validates comment data fields for consistency.
     """
     try:
         # Check if the file exists
@@ -150,13 +167,19 @@ def import_comments_from_file(comment_filepath, merge=True):
         return False
 
 def check_and_import_comment_file(data_filepath):
-    """Check if a comment file exists for the given data file and import it if found
+    """
+    Automatically detect and load comment file for a data file
     
     Args:
         data_filepath: Path to the data file to check for comments
         
     Returns:
         bool: True if comments were found and imported, False otherwise
+        
+    This function is used during file loading to check for and import
+    any associated comment files. It attempts to find a .comments.json
+    file with the same base name as the data file and imports any
+    comments it contains.
     """
     # Generate the expected comment file path
     comment_filepath = f"{data_filepath}.comments.json"

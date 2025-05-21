@@ -1,5 +1,13 @@
 """
-comment_list.py - Functions for displaying and managing the comment list
+comment_list.py - Comment List Display and Interaction
+
+This module implements the comment list UI component that displays all
+annotations in a scrollable, interactive list. It provides functionality for:
+
+- Creating and initializing the comment list panel
+- Displaying comments with relevant metadata
+- Handling user interactions (selection, scrolling)
+- Synchronizing the comment list with other UI components
 """
 
 import matplotlib.pyplot as plt
@@ -11,7 +19,19 @@ from utils import add_log_entry
 from visualization import update_comment_markers, display_selected_comment
 
 def create_comment_list_display():
-    """Create the comment list display panel"""
+    """
+    Create and initialize the comment list panel
+    
+    This function:
+    - Creates the matplotlib axes for the comment list
+    - Positions the panel appropriately within the UI
+    - Sets up scroll buttons and event handlers
+    - Initializes state variables for the comment list
+    - Configures visual styling for the panel
+    
+    Returns:
+        The axes object for the comment list panel
+    """
     # Get spectrogram position to align with
     spec_pos = state.ax_spec.get_position() if hasattr(state, 'ax_spec') else None
     
@@ -72,7 +92,21 @@ def create_comment_list_display():
     return state.ax_comment_list
 
 def update_comment_list_display():
-    """Update the comment list display with current comments"""
+    """
+    Update the comment list display with current comments
+    
+    This function refreshes the comment list panel to reflect the current
+    state of comments, including:
+    - Clearing previous content
+    - Sorting comments chronologically
+    - Displaying visible comments based on scroll position
+    - Highlighting the selected comment
+    - Showing comment metadata (title, notes, time range)
+    - Handling pagination and scroll indicators
+    
+    The function is called whenever the comment list needs to be refreshed,
+    such as after adding, editing, or deleting comments.
+    """
     if not hasattr(state, 'ax_comment_list') or state.ax_comment_list is None:
         add_log_entry("Comment list display not initialized")
         return
@@ -195,7 +229,21 @@ def update_comment_list_display():
     plt.draw()
 
 def on_comment_list_pick(event):
-    """Handle click on a comment in the comment list"""
+    """
+    Handle user clicks on comments in the comment list
+    
+    Args:
+        event: The matplotlib pick event containing information about the clicked object
+        
+    This function:
+    - Identifies which comment was clicked
+    - Updates the selected comment state
+    - Centers the main view on the selected comment
+    - Updates UI components to reflect the new selection
+    - Updates button states and labels based on the selection
+    
+    This is the primary way users select and navigate to comments.
+    """
     if (hasattr(event.artist, 'comment_id') and 
         hasattr(state, 'ax_comment_list') and 
         event.artist in state.ax_comment_list.patches):
@@ -238,12 +286,29 @@ def on_comment_list_pick(event):
             add_log_entry(f"Comment {clicked_comment_id} not found")
 
 def scroll_comments_up(event):
-    """Scroll the comment list up"""
+    """
+    Scroll the comment list up by one position
+    
+    Args:
+        event: The button click event (not used)
+    
+    This function decreases the comment list scroll position
+    while ensuring it stays within valid bounds.
+    """
     state.comment_list_position = max(0, state.comment_list_position - 1)
     update_comment_list_display()
 
 def scroll_comments_down(event):
-    """Scroll the comment list down"""
+    """
+    Scroll the comment list down by one position
+    
+    Args:
+        event: The button click event (not used)
+    
+    This function increases the comment list scroll position
+    while ensuring it stays within valid bounds based on the
+    total number of comments and visible comment count.
+    """
     # Calculate max position using the sorted comments count
     sorted_comments = sorted(state.comments, key=lambda c: c['start_idx'])
     max_position = max(0, len(sorted_comments) - state.visible_comments)
@@ -251,7 +316,18 @@ def scroll_comments_down(event):
     update_comment_list_display()
     
 def center_on_comment(comment):
-    """Center the main view on the selected comment"""
+    """
+    Center the main visualization view on a specific comment
+    
+    Args:
+        comment: The comment object to center on
+        
+    This function adjusts the zoom level and position of the main
+    spectrogram view to center on the time range of the specified comment.
+    It ensures the comment is fully visible with appropriate padding, and
+    maintains a reasonable zoom level that shows enough context around
+    the comment.
+    """
     if not comment or not hasattr(state, 'ax_spec'):
         return
         

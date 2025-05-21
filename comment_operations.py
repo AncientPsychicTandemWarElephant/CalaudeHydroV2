@@ -1,5 +1,9 @@
 """
-comment_operations.py - Comment system operations
+comment_operations.py - Comment Management Operations
+
+This module provides core functionality for comment management, including
+deletion and other operations that affect comments. It centralizes comment
+operations to maintain consistency across the application UI.
 """
 
 import matplotlib.pyplot as plt
@@ -8,7 +12,18 @@ from utils import add_log_entry
 import state
 
 def delete_selected_comment():
-    """Delete the currently selected comment"""
+    """
+    Delete the currently selected comment with confirmation dialog
+    
+    This function handles the complete comment deletion workflow:
+    - Verifies a comment is selected
+    - Displays a confirmation dialog
+    - Removes the comment if confirmed
+    - Updates all relevant UI components to reflect the change
+    
+    Returns:
+        bool: True if comment was deleted, False otherwise
+    """
     add_log_entry("Delete selected comment called")
     
     # Check if a comment is selected
@@ -72,5 +87,7 @@ def delete_selected_comment():
         
         plt.draw()
         add_log_entry("Comment deleted successfully")
+        return True
     else:
         add_log_entry("Delete cancelled")
+        return False
