@@ -1,0 +1,49 @@
+# Environment
+hydrophone_env/
+venv/
+env/
+__pycache__/
+
+# Cache files
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.dll
+*.exe
+
+# Logs and temporary files
+logs/
+*.log
+error_log*.txt
+*.tmp
+*.temp
+*.swp
+*~
+
+# Data files
+sabic fat/
+*.wav
+*.dat
+
+# Sensitive files
+*.key
+*.pem
+*.env
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.Zone.Identifier
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
