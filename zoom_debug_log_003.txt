@@ -1,0 +1,12 @@
+Zoom Debug Log File #3
+Created at: 2025-05-21 23:13:17.766679
+This log contains only zoom-related debugging information
+--------------------------------------------------
+[23:13:17.773] [ZOOM] Text elements after removal: 0
+[23:13:17.780] [ZOOM] Creating position indicator text...
+[23:13:17.787] [ZOOM] Position indicator text created successfully
+[23:13:17.792] [ZOOM] Final navigation patch count: 4
+[23:13:17.798] [ZOOM] Forcing canvas redraw...
+[23:13:17.804] [ZOOM] Canvas redraw completed successfully
+[23:13:17.819] [ZOOM] ZOOM COMPLETE: Time taken: 197.20ms
+[23:13:17.824] update_time_zoom complete
