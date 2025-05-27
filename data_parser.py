@@ -40,6 +40,19 @@ def parse_hydrophone_file(file_path):
             "timezone": "UTC",  # Default timezone
         }
         
+        # Detect if file has been processed by export tool (timezone-converted)
+        export_tool_processed = False
+        start_time_from_header = None
+        
+        # Check for export tool signatures
+        for line in lines[:30]:
+            if line.startswith("File Details:"):
+                export_tool_processed = True
+                add_log_entry("Detected file processed by Export Tool")
+            elif line.startswith("Start Time\t"):
+                start_time_from_header = line.split("\t")[-1].strip()
+                add_log_entry(f"Found Start Time in header: {start_time_from_header}")
+        
         # Try to extract Client and Job from the file header
         if not state.project_name:  # Only set if not already set
             client = ""
@@ -105,6 +118,10 @@ def parse_hydrophone_file(file_path):
         comments_data = []  # Track comments for each row
         current_comment = None
         
+        # Log export tool processing status once per file
+        if export_tool_processed:
+            add_log_entry(f"Export tool processed file - timestamps already in {metadata['timezone']}")
+        
         for line in lines[start_idx + 1:]:
             parts = line.strip().split('\t')  # Changed to tab split for Lucy format
             if len(parts) < 6:
@@ -151,15 +168,26 @@ def parse_hydrophone_file(file_path):
                     logging.warning(f"Invalid timezone in file: {metadata['timezone']} - {str(e)}")
                     file_tz = pytz.UTC
             
-            # Localize to file timezone first, then convert to UTC for storage
-            try:
-                # Localize using the file timezone
-                local_time = file_tz.localize(local_dt)
-                # Convert to UTC for internal storage
-                utc_time = local_time.astimezone(pytz.UTC)
-            except Exception:
-                # Fallback to UTC if there are issues
-                utc_time = pytz.UTC.localize(local_dt)
+            # Handle timezone conversion based on file type
+            if export_tool_processed:
+                # For export-tool-processed files, timestamps are already in the target timezone
+                # Treat them as UTC to maintain timeline consistency across files
+                try:
+                    # The timestamps are already converted by export tool, treat as UTC for internal consistency
+                    utc_time = pytz.UTC.localize(local_dt)
+                except Exception:
+                    # Fallback to UTC if there are issues
+                    utc_time = pytz.UTC.localize(local_dt)
+            else:
+                # For original files, assume timestamps are naive local time that needs conversion
+                try:
+                    # Localize using the file timezone
+                    local_time = file_tz.localize(local_dt)
+                    # Convert to UTC for internal storage
+                    utc_time = local_time.astimezone(pytz.UTC)
+                except Exception:
+                    # Fallback to UTC if there are issues
+                    utc_time = pytz.UTC.localize(local_dt)
                 
             time_objects.append(utc_time)
             # Skip to the column after "Data Points" value (which would be at data_points_idx)

@@ -1,4 +1,93 @@
 Zoom Debug Log File #1
-Created at: 2025-05-23 14:15:36.208499
+Created at: 2025-05-27 11:08:45.330209
 This log contains only zoom-related debugging information
 --------------------------------------------------
+[11:08:45.988] Navigation controls created
+[11:08:46.269] Setting initial zoom to 0-1000
+[11:08:46.277] [ZOOM] ZOOM START: updating zoom to 0.00 - 1000.00
+[11:08:46.283] [ZOOM] Previous zoom was: 0 - 6414
+[11:08:46.291] update_time_zoom called: 0 - 1000
+[11:08:46.298] [ZOOM] Data length: 6415
+[11:08:46.304] [ZOOM] Zoom width: 1000
+[11:08:46.310] [ZOOM] Previous spec xlim: (np.float64(0.0), np.float64(6414.0))
+[11:08:46.318] [ZOOM] New spec xlim: (np.float64(0.0), np.float64(1000.0))
+[11:08:46.331] [ZOOM] Updating spectrogram x-axis labels...
+[11:08:46.339] [ZOOM] X-axis labels updated successfully
+[11:08:46.350] [ZOOM] Previous timeline xlim: (np.float64(0.0), np.float64(1000.0))
+[11:08:46.362] [ZOOM] New timeline xlim: (np.float64(0.0), np.float64(1000.0))
+[11:08:46.369] [ZOOM] Updating nav box with width: 1000
+[11:08:46.385] [ZOOM] Navigation patches before removal: 4
+[11:08:46.393] [ZOOM] Navigation patches after removal: 0
+[11:08:46.399] [ZOOM] Creating new navigation box...
+[11:08:46.409] [ZOOM] Navigation box created successfully
+[11:08:46.416] [ZOOM] Creating navigation highlight...
+[11:08:46.423] [ZOOM] Navigation highlight created successfully
+[11:08:46.431] [ZOOM] Creating edge handles...
+[11:08:46.438] [ZOOM] Edge handles created successfully
+[11:08:46.447] [ZOOM] Text elements before removal: 2
+[11:08:46.453] [ZOOM] Text elements after removal: 0
+[11:08:46.459] [ZOOM] Creating position indicator text...
+[11:08:46.467] [ZOOM] Position indicator text created successfully
+[11:08:46.473] [ZOOM] Final navigation patch count: 4
+[11:08:46.479] [ZOOM] Forcing canvas redraw...
+[11:08:46.485] [ZOOM] Canvas redraw completed successfully
+[11:08:46.491] [ZOOM] ZOOM COMPLETE: Time taken: 215.87ms
+[11:08:46.496] update_time_zoom complete
+[11:08:49.727] [ZOOM] ZOOM START: updating zoom to 1065.00 - 2065.00
+[11:08:49.733] [ZOOM] Previous zoom was: 0 - 1000
+[11:08:49.738] update_time_zoom called: 1065 - 2065
+[11:08:49.743] [ZOOM] Data length: 6415
+[11:08:49.749] [ZOOM] Zoom width: 1000
+[11:08:49.756] [ZOOM] Previous spec xlim: (np.float64(0.0), np.float64(1000.0))
+[11:08:49.762] [ZOOM] New spec xlim: (np.float64(1065.0), np.float64(2065.0))
+[11:08:49.774] [ZOOM] Updating spectrogram x-axis labels...
+[11:08:49.781] [ZOOM] X-axis labels updated successfully
+[11:08:49.787] [ZOOM] Previous timeline xlim: (np.float64(1065.0), np.float64(2065.0))
+[11:08:49.792] [ZOOM] New timeline xlim: (np.float64(1065.0), np.float64(2065.0))
+[11:08:49.798] [ZOOM] Updating nav box with width: 1000
+[11:08:49.805] [ZOOM] Navigation patches before removal: 4
+[11:08:49.840] [ZOOM] Navigation patches after removal: 0
+[11:08:49.846] [ZOOM] Creating new navigation box...
+[11:08:49.853] [ZOOM] Navigation box created successfully
+[11:08:49.859] [ZOOM] Creating navigation highlight...
+[11:08:49.865] [ZOOM] Navigation highlight created successfully
+[11:08:49.871] [ZOOM] Creating edge handles...
+[11:08:49.879] [ZOOM] Edge handles created successfully
+[11:08:49.886] [ZOOM] Text elements before removal: 1
+[11:08:49.893] [ZOOM] Text elements after removal: 0
+[11:08:49.899] [ZOOM] Creating position indicator text...
+[11:08:49.906] [ZOOM] Position indicator text created successfully
+[11:08:49.914] [ZOOM] Final navigation patch count: 4
+[11:08:49.920] [ZOOM] Forcing canvas redraw...
+[11:08:49.927] [ZOOM] Canvas redraw completed successfully
+[11:08:49.934] [ZOOM] ZOOM COMPLETE: Time taken: 205.67ms
+[11:08:49.940] update_time_zoom complete
+[11:08:50.928] [ZOOM] ZOOM START: updating zoom to 3554.00 - 4554.00
+[11:08:50.934] [ZOOM] Previous zoom was: 1065 - 2065
+[11:08:50.939] update_time_zoom called: 3554 - 4554
+[11:08:50.945] [ZOOM] Data length: 6415
+[11:08:50.950] [ZOOM] Zoom width: 1000
+[11:08:50.956] [ZOOM] Previous spec xlim: (np.float64(1065.0), np.float64(2065.0))
+[11:08:50.961] [ZOOM] New spec xlim: (np.float64(3554.0), np.float64(4554.0))
+[11:08:50.974] [ZOOM] Updating spectrogram x-axis labels...
+[11:08:50.982] [ZOOM] X-axis labels updated successfully
+[11:08:50.988] [ZOOM] Previous timeline xlim: (np.float64(3554.0), np.float64(4554.0))
+[11:08:50.994] [ZOOM] New timeline xlim: (np.float64(3554.0), np.float64(4554.0))
+[11:08:51.000] [ZOOM] Updating nav box with width: 1000
+[11:08:51.007] [ZOOM] Navigation patches before removal: 4
+[11:08:51.013] [ZOOM] Navigation patches after removal: 0
+[11:08:51.019] [ZOOM] Creating new navigation box...
+[11:08:51.025] [ZOOM] Navigation box created successfully
+[11:08:51.030] [ZOOM] Creating navigation highlight...
+[11:08:51.037] [ZOOM] Navigation highlight created successfully
+[11:08:51.043] [ZOOM] Creating edge handles...
+[11:08:51.050] [ZOOM] Edge handles created successfully
+[11:08:51.057] [ZOOM] Text elements before removal: 1
+[11:08:51.063] [ZOOM] Text elements after removal: 0
+[11:08:51.069] [ZOOM] Creating position indicator text...
+[11:08:51.075] [ZOOM] Position indicator text created successfully
+[11:08:51.081] [ZOOM] Final navigation patch count: 4
+[11:08:51.087] [ZOOM] Forcing canvas redraw...
+[11:08:51.093] [ZOOM] Canvas redraw completed successfully
+[11:08:51.098] [ZOOM] ZOOM COMPLETE: Time taken: 170.10ms
+[11:08:51.104] update_time_zoom complete

@@ -48,21 +48,75 @@ The Hydrophone Analyzer is currently a functional application with several techn
    - Significant error logging infrastructure suggests recurring issues
    - Recovery mechanisms need enhancement
 
+4. **RESOLVED: Export Data Integrity Issue (FIXED)**:
+   - **Problem**: Multi-file exports created massive 8-hour timeline gaps in spectrogram visualization
+   - **Root Cause Analysis**: Two-part timezone conversion bug in Export Tool
+     - **Part 1**: Data timestamps were converted correctly (e.g., `02:29:13 UTC` → `10:29:13 Australia/Perth`)
+     - **Part 2**: Header Start Time remained unconverted (still showing `02:29:13` with `Australia/Perth` timezone)
+     - **Result**: Header claimed file started at `02:29:13 Australia/Perth` but data started at `10:29:13 Australia/Perth`
+     - **Impact**: 8-hour inconsistency caused hydrophone viewer to interpret timeline as having massive gaps
+   - **Deep Dive Investigation (May 2025)**:
+     - Initial fix converted data timestamps but missed header Start Time conversion
+     - Issue persisted due to two bugs in `export_processor.py`:
+       1. `_create_ocean_sonics_header()` not converting Start Time when timezone changed
+       2. `_regroup_sorted_data()` not preserving `original_timezone` field during chronological sorting
+   - **Comprehensive Solution**:
+     - **Export Tool Fixes**:
+       - **Bug 1 Fix**: Enhanced `_create_ocean_sonics_header()` to detect timezone changes and convert Start Time
+       - **Bug 2 Fix**: Added `_convert_start_time_timezone()` helper function for header timestamp conversion
+       - **Bug 3 Fix**: Modified `_regroup_sorted_data()` to preserve `original_timezone` field during sorting
+     - **Hydrophone Viewer Fix**:
+       - **Bug 4 Fix**: Added detection for export-tool-processed files to prevent double timezone conversion
+       - **Bug 5 Fix**: Modified timestamp handling to preserve already-converted timestamps
+     - **Result**: Perfect header/data timestamp consistency in all export modes + eliminated viewer gaps
+   - **Verification Results**:
+     - **Before Fix**: Header `02:12:34 Australia/Perth`, Data `10:12:34` → **8.0 hour GAP**
+     - **After Fix**: Header `10:12:34 Australia/Perth`, Data `10:12:34` → **CONSISTENT**
+     - **Individual Exports**: ✅ All files show perfect header/data consistency
+     - **Combined Exports**: ✅ Perfect header/data consistency maintained
+     - **Timeline Continuity**: ✅ Natural 16.6-minute gaps between recordings (not 8-hour gaps)
+   - **Status**: FULLY RESOLVED - Timeline gaps completely eliminated, continuous spectrogram visualization restored
+   - **Test Data Locations**:
+     - Original SABIC files: `/ClaudeHydro/probems/sabic fat/sabic fat/` (7 files: wavtS_20250423_*.txt)
+     - Broken exported files: `/ClaudeHydro/probems/multi/` (7 files: wavtS_20250423_*_edited.txt)
+     - Fixed test files: `/ClaudeHydro/probems/final_fix_validation/` (individual + combined exports)
+     - Visual evidence: `/ClaudeHydro/probems/og multi.png` vs `/ClaudeHydro/probems/exported multi.png`
+   - **Fix Implementation**:
+     - **Export Tool**: `/ClaudeHydro/Export Tool/export_processor.py` (lines 566-573, 694-741, 467)
+       - Added `_convert_start_time_timezone()` method for header timestamp conversion
+       - Enhanced `_create_ocean_sonics_header()` with timezone conversion logic
+       - Fixed `_regroup_sorted_data()` to preserve original timezone information
+     - **Hydrophone Viewer**: `/ClaudeHydro/Hydrophone Claude Code/data_parser.py` (lines 44-54, 168-189)
+       - Added export-tool-processed file detection ("File Details:" signature)
+       - Modified timezone handling to prevent double conversion for processed files
+       - Preserves timeline continuity for timezone-converted exports
+
 ## Development Priority Areas
 
-### 1. Stability Enhancements (Immediate Priority)
+### 1. Critical Export Data Integrity Fix (COMPLETED ✅)
 
-#### 1.1. Button Handler Consolidation
+#### 1.1. Multi-File Export Gap Issue Resolution  
+- [x] Investigate data continuity corruption in Export Tool multi-file processing
+- [x] Analyze timestamp handling and gap creation during export merging
+- [x] Compare original vs exported data structures to identify corruption source
+- [x] Fix time sequence preservation to maintain continuous spectrogram data
+- [x] Validate export process preserves data density and temporal relationships
+- [x] Implement `_convert_data_line_timezone()` function for proper timestamp conversion
+- [x] Test with actual SABIC files - confirmed perfect continuity (1 second gaps as expected)
+
+### 2. Stability Enhancements (High Priority)
+
+#### 2.1. Button Handler Consolidation
 - [ ] Refactor button handling to use a consistent approach within existing modules
 - [ ] Eliminate dependency on position-based button detection
 - [ ] Implement more reliable event registration
 
-#### 1.2. Navigation System Robustness
+#### 2.2. Navigation System Robustness
 - [ ] Debug and fix the time zoom functionality
 - [ ] Enhance spectrogram updating to prevent rendering issues
 - [ ] Implement more granular debugging for navigation features
 
-#### 1.3. Error Handling Improvement
+#### 2.3. Error Handling Improvement
 - [ ] Create more robust recovery mechanisms for common errors
 - [ ] Enhance error logging to provide actionable information
 - [ ] Implement graceful degradation for non-critical failures
@@ -176,6 +230,8 @@ After architectural improvements, focus on new features:
 | 2025-05-21 | Switch to modal dialog for comment input           | Eliminate textbox lag and improve user experience |
 | 2025-05-21 | Create dedicated comment list panel                | Better organize and manage multiple comments |
 | 2025-05-21 | Use negative coordinate positioning for UI elements | Allow UI elements to extend beyond figure boundaries |
+| 2025-05-26 | Fix Export Tool timezone conversion bug | Resolve multi-file export timeline gaps by converting time data |
+| 2025-05-27 | Complete timezone bug fix with header Start Time conversion | Eliminate remaining 8-hour timeline gaps by fixing header/data inconsistency |
 
 ## Technical Debt Notes
 

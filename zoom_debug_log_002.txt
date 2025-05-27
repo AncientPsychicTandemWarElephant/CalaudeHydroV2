@@ -1,54 +1,22 @@
 Zoom Debug Log File #2
-Created at: 2025-05-21 23:20:33.481262
+Created at: 2025-05-26 22:39:05.570360
 This log contains only zoom-related debugging information
 --------------------------------------------------
-[23:20:33.488] [ZOOM] X-axis labels updated successfully
-[23:20:33.494] [ZOOM] Previous timeline xlim: (np.float64(0.0), np.float64(1000.0))
-[23:20:33.499] [ZOOM] New timeline xlim: (np.float64(0.0), np.float64(1000.0))
-[23:20:33.505] [ZOOM] Updating nav box with width: 1000
-[23:20:33.512] [ZOOM] Navigation patches before removal: 5
-[23:20:33.517] [ZOOM] Navigation patches after removal: 0
-[23:20:33.522] [ZOOM] Creating new navigation box...
-[23:20:33.528] [ZOOM] Navigation box created successfully
-[23:20:33.533] [ZOOM] Creating navigation highlight...
-[23:20:33.538] [ZOOM] Navigation highlight created successfully
-[23:20:33.544] [ZOOM] Creating edge handles...
-[23:20:33.550] [ZOOM] Edge handles created successfully
-[23:20:33.555] [ZOOM] Text elements before removal: 1
-[23:20:33.561] [ZOOM] Text elements after removal: 0
-[23:20:33.566] [ZOOM] Creating position indicator text...
-[23:20:33.573] [ZOOM] Position indicator text created successfully
-[23:20:33.578] [ZOOM] Final navigation patch count: 4
-[23:20:33.584] [ZOOM] Forcing canvas redraw...
-[23:20:33.590] [ZOOM] Canvas redraw completed successfully
-[23:20:33.609] [ZOOM] ZOOM COMPLETE: Time taken: 178.56ms
-[23:20:33.613] update_time_zoom complete
-[23:20:35.130] [ZOOM] ZOOM START: updating zoom to 0.00 - 1000.00
-[23:20:35.136] [ZOOM] Previous zoom was: 0 - 1000
-[23:20:35.141] update_time_zoom called: 0 - 1000
-[23:20:35.147] [ZOOM] Data length: 5660
-[23:20:35.153] [ZOOM] Zoom width: 1000
-[23:20:35.159] [ZOOM] Previous spec xlim: (np.float64(0.0), np.float64(1000.0))
-[23:20:35.167] [ZOOM] New spec xlim: (np.float64(0.0), np.float64(1000.0))
-[23:20:35.179] [ZOOM] Updating spectrogram x-axis labels...
-[23:20:35.189] [ZOOM] X-axis labels updated successfully
-[23:20:35.194] [ZOOM] Previous timeline xlim: (np.float64(0.0), np.float64(1000.0))
-[23:20:35.199] [ZOOM] New timeline xlim: (np.float64(0.0), np.float64(1000.0))
-[23:20:35.206] [ZOOM] Updating nav box with width: 1000
-[23:20:35.212] [ZOOM] Navigation patches before removal: 5
-[23:20:35.217] [ZOOM] Navigation patches after removal: 0
-[23:20:35.223] [ZOOM] Creating new navigation box...
-[23:20:35.229] [ZOOM] Navigation box created successfully
-[23:20:35.235] [ZOOM] Creating navigation highlight...
-[23:20:35.240] [ZOOM] Navigation highlight created successfully
-[23:20:35.246] [ZOOM] Creating edge handles...
-[23:20:35.251] [ZOOM] Edge handles created successfully
-[23:20:35.256] [ZOOM] Text elements before removal: 1
-[23:20:35.261] [ZOOM] Text elements after removal: 0
-[23:20:35.266] [ZOOM] Creating position indicator text...
-[23:20:35.271] [ZOOM] Position indicator text created successfully
-[23:20:35.276] [ZOOM] Final navigation patch count: 4
-[23:20:35.281] [ZOOM] Forcing canvas redraw...
-[23:20:35.287] [ZOOM] Canvas redraw completed successfully
-[23:20:35.304] [ZOOM] ZOOM COMPLETE: Time taken: 174.71ms
-[23:20:35.309] update_time_zoom complete
+[22:39:05.577] [ZOOM] Updating nav box with width: 1000
+[22:39:05.583] [ZOOM] Navigation patches before removal: 4
+[22:39:05.590] [ZOOM] Navigation patches after removal: 0
+[22:39:05.597] [ZOOM] Creating new navigation box...
+[22:39:05.603] [ZOOM] Navigation box created successfully
+[22:39:05.608] [ZOOM] Creating navigation highlight...
+[22:39:05.614] [ZOOM] Navigation highlight created successfully
+[22:39:05.621] [ZOOM] Creating edge handles...
+[22:39:05.628] [ZOOM] Edge handles created successfully
+[22:39:05.634] [ZOOM] Text elements before removal: 1
+[22:39:05.640] [ZOOM] Text elements after removal: 0
+[22:39:05.646] [ZOOM] Creating position indicator text...
+[22:39:05.652] [ZOOM] Position indicator text created successfully
+[22:39:05.658] [ZOOM] Final navigation patch count: 4
+[22:39:05.665] [ZOOM] Forcing canvas redraw...
+[22:39:05.671] [ZOOM] Canvas redraw completed successfully
+[22:39:05.677] [ZOOM] ZOOM COMPLETE: Time taken: 200.03ms
+[22:39:05.682] update_time_zoom complete
